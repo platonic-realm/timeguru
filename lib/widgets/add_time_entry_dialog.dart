@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/app_provider.dart';
 import '../models/time_entry.dart';
+import '../services/config_service.dart';
+import '../utils/icon_utils.dart';
 
 class AddTimeEntryDialog extends StatefulWidget {
-  final TimeEntry? entry;
+  final TimeEntry? timeEntry;
+  final bool isEditing;
 
-  const AddTimeEntryDialog({super.key, this.entry});
+  const AddTimeEntryDialog({
+    super.key,
+    this.timeEntry,
+    this.isEditing = false,
+  });
 
   @override
   State<AddTimeEntryDialog> createState() => _AddTimeEntryDialogState();
@@ -15,320 +21,300 @@ class AddTimeEntryDialog extends StatefulWidget {
 
 class _AddTimeEntryDialogState extends State<AddTimeEntryDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _typeController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  
-  DateTime _startTime = DateTime.now().subtract(const Duration(hours: 1));
-  DateTime _endTime = DateTime.now();
-  String _selectedCategory = 'Idle';
-  
-  final List<String> _categories = [
-    'Idle',
-    'Study',
-    'Work',
-    'Quotidian',
-    'Family',
-    'Unknown',
-  ];
-
-  bool _isEditing = false;
+  late TextEditingController _descriptionController;
+  late TextEditingController _typeController;
+  late DateTime _selectedDate;
+  late TimeOfDay _startTime;
+  late TimeOfDay _endTime;
+  String? _selectedCategoryId;
 
   @override
   void initState() {
     super.initState();
-    _isEditing = widget.entry != null;
-    if (_isEditing) {
-      final entry = widget.entry!;
-      _typeController.text = entry.type;
-      _descriptionController.text = entry.description;
-      _selectedCategory = entry.category;
-      _startTime = entry.startTime;
-      _endTime = entry.endTime;
+    if (widget.timeEntry != null) {
+      _descriptionController = TextEditingController(text: widget.timeEntry!.description);
+      _typeController = TextEditingController(text: widget.timeEntry!.type);
+      _selectedDate = widget.timeEntry!.date;
+      _startTime = TimeOfDay.fromDateTime(widget.timeEntry!.startTime);
+      _endTime = TimeOfDay.fromDateTime(widget.timeEntry!.endTime);
+      _selectedCategoryId = widget.timeEntry!.category;
+    } else {
+      _descriptionController = TextEditingController();
+      _typeController = TextEditingController();
+      _selectedDate = DateTime.now();
+      _startTime = TimeOfDay.now();
+      _endTime = TimeOfDay.now().replacing(hour: _startTime.hour + 1);
+      _selectedCategoryId = null;
     }
   }
 
   @override
   void dispose() {
-    _typeController.dispose();
     _descriptionController.dispose();
+    _typeController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(_isEditing ? 'Edit Time Entry' : 'Add Time Entry'),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Type field
-              TextFormField(
-                controller: _typeController,
-                decoration: const InputDecoration(
-                  labelText: 'Activity Type',
-                  hintText: 'e.g., PhD, Sleep, Shopping',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter an activity type';
-                  }
-                  return null;
-                },
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Description field
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'Brief description of the activity',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a description';
-                  }
-                  return null;
-                },
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Category dropdown
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
-                ),
-                items: _categories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value!;
-                  });
-                },
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Time selection
-              Row(
+    return Consumer<ConfigService>(
+      builder: (context, configService, child) {
+        final categories = configService.getActiveCategories();
+        
+        return AlertDialog(
+          title: Text(widget.isEditing ? 'Edit Time Entry' : 'Add Time Entry'),
+          content: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: _buildTimeField(
-                      'Start Time',
-                      _startTime,
-                      (time) => setState(() => _startTime = time),
+                  // Category Selection
+                  DropdownButtonFormField<String>(
+                    value: _selectedCategoryId,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      border: OutlineInputBorder(),
                     ),
+                    items: categories.map((category) {
+                      return DropdownMenuItem(
+                        value: category.id,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: _parseColor(category.color),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              IconUtils.getIconData(category.icon),
+                              color: _parseColor(category.color),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(category.name),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCategoryId = value;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please select a category';
+                      }
+                      return null;
+                    },
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTimeField(
-                      'End Time',
-                      _endTime,
-                      (time) => setState(() => _endTime = time),
+                  const SizedBox(height: 16),
+                  
+                  // Description
+                  TextFormField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      border: OutlineInputBorder(),
+                      hintText: 'What did you do?',
                     ),
+                    maxLines: 3,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter a description';
+                      }
+                      return null;
+                    },
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // Date Selection
+                  ListTile(
+                    title: const Text('Date'),
+                    subtitle: Text(
+                      DateFormat('EEEE, MMMM d, y').format(_selectedDate),
+                    ),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () => _selectDate(context),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Time Selection
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ListTile(
+                          title: const Text('Start Time'),
+                          subtitle: Text(_startTime.format(context)),
+                          trailing: const Icon(Icons.access_time),
+                          onTap: () => _selectStartTime(context),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListTile(
+                          title: const Text('End Time'),
+                          subtitle: Text(_endTime.format(context)),
+                          trailing: const Icon(Icons.access_time),
+                          onTap: () => _selectEndTime(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  // Duration Display
+                  if (_startTime != _endTime)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(top: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.timer),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Duration: ${_calculateDuration()}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Duration display
-              _buildDurationDisplay(),
-            ],
+            ),
           ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _submitForm,
-          child: Text(_isEditing ? 'Update Entry' : 'Add Entry'),
-        ),
-      ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: _saveTimeEntry,
+              child: Text(widget.isEditing ? 'Update' : 'Add'),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildTimeField(
-    String label,
-    DateTime time,
-    ValueChanged<DateTime> onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: () => _selectTime(context, time, onChanged),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outline,
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  DateFormat('HH:mm').format(time),
-                  style: const TextStyle(fontSize: 16),
-                ),
-                const Spacer(),
-                const Icon(Icons.arrow_drop_down),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDurationDisplay() {
-    final duration = _endTime.difference(_startTime);
-    final isValid = duration.isNegative == false;
-    
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isValid 
-            ? Theme.of(context).colorScheme.primaryContainer
-            : Theme.of(context).colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isValid ? Icons.schedule : Icons.error,
-            color: isValid 
-                ? Theme.of(context).colorScheme.onPrimaryContainer
-                : Theme.of(context).colorScheme.onErrorContainer,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            isValid 
-                ? 'Duration: ${_formatDuration(duration)}'
-                : 'Invalid time range',
-            style: TextStyle(
-              color: isValid 
-                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                  : Theme.of(context).colorScheme.onErrorContainer,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _selectTime(
-    BuildContext context,
-    DateTime initialTime,
-    ValueChanged<DateTime> onChanged,
-  ) async {
-    final TimeOfDay? time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initialTime),
-    );
-    
-    if (time != null) {
-      final newDateTime = DateTime(
-        initialTime.year,
-        initialTime.month,
-        initialTime.day,
-        time.hour,
-        time.minute,
-      );
-      onChanged(newDateTime);
+  Color _parseColor(String colorString) {
+    try {
+      if (colorString.startsWith('#')) {
+        return Color(int.parse('FF${colorString.substring(1)}', radix: 16));
+      }
+      return Colors.grey;
+    } catch (e) {
+      return Colors.grey;
     }
   }
 
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes % 60;
+  String _calculateDuration() {
+    final startMinutes = _startTime.hour * 60 + _startTime.minute;
+    final endMinutes = _endTime.hour * 60 + _endTime.minute;
+    final durationMinutes = endMinutes - startMinutes;
     
-    if (hours > 0) {
+    if (durationMinutes <= 0) return '0 minutes';
+    
+    final hours = durationMinutes ~/ 60;
+    final minutes = durationMinutes % 60;
+    
+    if (hours > 0 && minutes > 0) {
       return '${hours}h ${minutes}m';
+    } else if (hours > 0) {
+      return '${hours}h';
     } else {
       return '${minutes}m';
     }
   }
 
-  void _submitForm() {
-    if (!_formKey.currentState!.validate()) return;
-    
-    final duration = _endTime.difference(_startTime);
-    if (duration.isNegative) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('End time must be after start time'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
     }
-    
-    final provider = context.read<AppProvider>();
-    
-    if (_isEditing) {
-      // Update existing entry
-      final updatedEntry = widget.entry!.copyWith(
-        type: _typeController.text.trim(),
-        startTime: _startTime,
-        endTime: _endTime,
+  }
+
+  Future<void> _selectStartTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _startTime,
+    );
+    if (picked != null && picked != _startTime) {
+      setState(() {
+        _startTime = picked;
+        // Ensure end time is after start time
+        if (_endTime.hour * 60 + _endTime.minute <= _startTime.hour * 60 + _startTime.minute) {
+          _endTime = _startTime.replacing(hour: _startTime.hour + 1);
+        }
+      });
+    }
+  }
+
+  Future<void> _selectEndTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _endTime,
+    );
+    if (picked != null && picked != _endTime) {
+      setState(() {
+        _endTime = picked;
+      });
+    }
+  }
+
+  void _saveTimeEntry() {
+    if (_formKey.currentState!.validate()) {
+      // Create DateTime objects for start and end times
+      final startDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _startTime.hour,
+        _startTime.minute,
+      );
+      
+      DateTime endDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _endTime.hour,
+        _endTime.minute,
+      );
+      
+      // If end time is before start time, it's on the next day
+      if (endDateTime.isBefore(startDateTime)) {
+        endDateTime = endDateTime.add(const Duration(days: 1));
+      }
+      
+      final duration = endDateTime.difference(startDateTime);
+      
+      final timeEntry = TimeEntry(
+        id: widget.timeEntry?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        type: _typeController.text.trim().isNotEmpty ? _typeController.text.trim() : 'General',
         description: _descriptionController.text.trim(),
-        category: _selectedCategory,
+        category: _selectedCategoryId!,
+        date: _selectedDate,
+        startTime: startDateTime,
+        endTime: endDateTime,
         duration: duration,
       );
-      provider.updateTimeEntry(updatedEntry);
-    } else {
-      // Create new entry
-      provider.addTimeEntry(
-        type: _typeController.text.trim(),
-        startTime: _startTime,
-        endTime: _endTime,
-        description: _descriptionController.text.trim(),
-        category: _selectedCategory,
-      );
+      
+      Navigator.of(context).pop(timeEntry);
     }
-    
-    Navigator.of(context).pop();
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isEditing ? 'Time entry updated successfully' : 'Time entry added successfully'),
-        backgroundColor: Colors.green,
-      ),
-    );
   }
 }

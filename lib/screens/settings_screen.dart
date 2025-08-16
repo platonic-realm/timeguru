@@ -1,68 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
-import '../providers/app_provider.dart';
 import '../services/config_service.dart';
+import '../widgets/edit_category_dialog.dart';
+import '../widgets/edit_goal_dialog.dart';
+import '../utils/icon_utils.dart';
 
-
-
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
       ),
-      body: Consumer<AppProvider>(
-        builder: (context, provider, child) {
-          return ListView(
+      body: Consumer<ConfigService>(
+        builder: (context, configService, child) {
+          if (!configService.isInitialized) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            children: [
-              // Data Directory Section
-              _buildSectionHeader('Data Storage'),
-              _buildDataDirectoryCard(context, provider),
-              const SizedBox(height: 24),
-              
-              // Calendar Integration Section
-                                        _buildSectionHeader('Appearance'),
-                          _buildAppearanceCard(context),
-                          const SizedBox(height: 24),
-                          
-                          _buildSectionHeader('Calendar Integration'),
-                          _buildCalendarSettingsCard(context, provider),
-                          const SizedBox(height: 24),
-              
-              // Export Section
-              _buildSectionHeader('Data Management'),
-              _buildExportCard(context, provider),
-              const SizedBox(height: 24),
-              
-              // About Section
-              _buildSectionHeader('About'),
-              _buildAboutCard(context),
-            ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Data Directory Section
+                _buildDataDirectoryCard(configService),
+                const SizedBox(height: 16),
+                
+                // Appearance Section
+                _buildAppearanceCard(configService),
+                const SizedBox(height: 16),
+                
+                // Categories Section
+                _buildCategoriesCard(configService),
+                const SizedBox(height: 16),
+                
+                // Goals Section
+                _buildGoalsCard(configService),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataDirectoryCard(BuildContext context, AppProvider provider) {
+  Widget _buildDataDirectoryCard(ConfigService configService) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -75,56 +66,47 @@ class SettingsScreen extends StatelessWidget {
                   Icons.folder,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(width: 12),
-                const Text(
+                const SizedBox(width: 8),
+                Text(
                   'Data Directory',
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                provider.dataDirectoryPath,
-                style: const TextStyle(fontFamily: 'monospace'),
+            const SizedBox(height: 12),
+            Text(
+              'Your data is stored in the selected directory. You can change this location at any time.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-            
             const SizedBox(height: 16),
-            
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _selectDataDirectory(context, provider),
-                    icon: const Icon(Icons.folder_open),
-                    label: const Text('Change Directory'),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                    child: Text(
+                      configService.dataDirectory ?? 'No directory selected',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                
+                ElevatedButton(
+                  onPressed: () => _selectDataDirectory(configService),
+                  child: const Text('Change'),
+                ),
               ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            Text(
-              'This directory stores all your TimeGuru data including time entries, tasks, and diary entries. '
-              'You can change this to sync with your Obsidian vault or other cloud storage.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
             ),
           ],
         ),
@@ -132,250 +114,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCalendarSettingsCard(BuildContext context, AppProvider provider) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.calendar_today,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Calendar Integration',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            SwitchListTile(
-              title: const Text('Auto-sync to Calendar'),
-              subtitle: const Text('Automatically add time entries and tasks to your device calendar'),
-              value: provider.configService.autoSyncCalendar,
-              onChanged: (value) async {
-                await provider.configService.setAutoSyncCalendar(value);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Calendar sync setting updated')),
-                );
-              },
-            ),
-            
-            SwitchListTile(
-              title: const Text('Create iCal Files'),
-              subtitle: const Text('Generate .ics files for external calendar apps'),
-              value: provider.configService.createICalFiles,
-              onChanged: (value) async {
-                await provider.configService.setCreateICalFiles(value);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('iCal generation setting updated')),
-                );
-              },
-            ),
-            
-            const SizedBox(height: 12),
-            
-            Text(
-              'TimeGuru can automatically sync your activities with your device calendar '
-              'and create iCal files that can be imported into other calendar applications.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExportCard(BuildContext context, AppProvider provider) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.download,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Data Export',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            ElevatedButton.icon(
-              onPressed: () => _exportData(context, provider),
-              icon: const Icon(Icons.download),
-              label: const Text('Export All Data'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              ),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            Text(
-              'Export your data to a backup location. This includes all time entries, tasks, '
-              'diary entries, and calendar files in both JSON and Markdown formats.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAboutCard(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.info,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'About TimeGuru',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            const ListTile(
-              leading: Icon(Icons.code),
-              title: Text('Version'),
-              subtitle: Text('1.0.0'),
-            ),
-            
-            const ListTile(
-              leading: Icon(Icons.description),
-              title: Text('Description'),
-              subtitle: Text('Personal time tracking, task management, and diary app'),
-            ),
-            
-            const ListTile(
-              leading: Icon(Icons.storage),
-              title: Text('Storage'),
-              subtitle: Text('File-based with Markdown support'),
-            ),
-            
-            const ListTile(
-              leading: Icon(Icons.sync),
-              title: Text('Sync'),
-              subtitle: Text('Calendar integration and iCal export'),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            Text(
-              'TimeGuru is designed to work seamlessly with your existing file-based workflow. '
-              'All data is stored in human-readable formats that can be easily synced across devices '
-              'and integrated with tools like Obsidian.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Action methods
-  Future<void> _selectDataDirectory(BuildContext context, AppProvider provider) async {
-    try {
-      String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Select Data Directory',
-      );
-      
-      if (selectedDirectory != null) {
-        await provider.setDataDirectory(selectedDirectory);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Data directory changed to: $selectedDirectory'),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to change data directory: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
-
-
-
-  Future<void> _exportData(BuildContext context, AppProvider provider) async {
-    try {
-      String? exportDirectory = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Select Export Directory',
-      );
-      
-      if (exportDirectory != null) {
-        await provider.exportData(exportDirectory);
-        
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Data exported successfully to: $exportDirectory'),
-              backgroundColor: Theme.of(context).colorScheme.primary,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to export data: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
-  }
-
-  Widget _buildAppearanceCard(BuildContext context) {
+  Widget _buildAppearanceCard(ConfigService configService) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -388,99 +127,32 @@ class SettingsScreen extends StatelessWidget {
                   Icons.palette,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Theme',
-                  style: TextStyle(
-                    fontSize: 16,
+                const SizedBox(width: 8),
+                Text(
+                  'Appearance',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            
-            Consumer<ConfigService>(
-              builder: (context, configService, child) {
-                final currentThemeMode = _parseThemeMode(configService.themeMode);
-                
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.light_mode),
-                      title: const Text('Light Theme'),
-                      subtitle: const Text('Use light color scheme'),
-                      trailing: Radio<ThemeMode>(
-                        value: ThemeMode.light,
-                        groupValue: currentThemeMode,
-                        onChanged: (value) async {
-                          if (value != null) {
-                            await configService.setThemeMode('light');
-                            // Notify parent to update theme
-                            final themeSetter = context.read<Function(ThemeMode)>();
-                            themeSetter(ThemeMode.light);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            
-            Consumer<ConfigService>(
-              builder: (context, configService, child) {
-                final currentThemeMode = _parseThemeMode(configService.themeMode);
-                
-                return Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.dark_mode),
-                      title: const Text('Dark Theme'),
-                      subtitle: const Text('Use dark color scheme'),
-                      trailing: Radio<ThemeMode>(
-                        value: ThemeMode.dark,
-                        groupValue: currentThemeMode,
-                        onChanged: (value) async {
-                          if (value != null) {
-                            await configService.setThemeMode('dark');
-                            // Notify parent to update theme
-                            final themeSetter = context.read<Function(ThemeMode)>();
-                            themeSetter(ThemeMode.dark);
-                          }
-                        },
-                      ),
-                    ),
-                    
-                    ListTile(
-                      leading: const Icon(Icons.settings_system_daydream),
-                      title: const Text('System Theme'),
-                      subtitle: const Text('Follow system appearance'),
-                      trailing: Radio<ThemeMode>(
-                        value: ThemeMode.system,
-                        groupValue: currentThemeMode,
-                        onChanged: (value) async {
-                          if (value != null) {
-                            await configService.setThemeMode('system');
-                            // Notify parent to update theme
-                            final themeSetter = context.read<Function(ThemeMode)>();
-                            themeSetter(ThemeMode.system);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            
-            const SizedBox(height: 12),
-            
-            Text(
-              'Choose your preferred theme. System theme will automatically switch between light and dark based on your device settings.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
+            ListTile(
+              title: const Text('Theme'),
+              subtitle: Text(_getThemeModeName(configService.themeMode)),
+              trailing: DropdownButton<ThemeMode>(
+                value: configService.themeMode,
+                onChanged: (ThemeMode? newValue) {
+                  if (newValue != null && context.mounted) {
+                    configService.setThemeMode(newValue);
+                  }
+                },
+                items: ThemeMode.values.map((ThemeMode mode) {
+                  return DropdownMenuItem<ThemeMode>(
+                    value: mode,
+                    child: Text(_getThemeModeName(mode)),
+                  );
+                }).toList(),
               ),
             ),
           ],
@@ -488,15 +160,432 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
-  
-  ThemeMode _parseThemeMode(String themeMode) {
-    switch (themeMode) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
+
+  Widget _buildCategoriesCard(ConfigService configService) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.category,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Time Entry Categories',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: () => _addCategory(configService),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...configService.categories.map((category) => _buildCategoryTile(category, configService)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryTile(TimeEntryCategory category, ConfigService configService) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: _parseColor(category.color).withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          _getIconData(category.icon),
+          color: _parseColor(category.color),
+        ),
+      ),
+      title: Text(category.name),
+      subtitle: Text(category.isDefault ? 'Default Category' : 'Custom Category'),
+      trailing: category.isDefault
+          ? const Chip(label: Text('Default'))
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () => _editCategory(category, configService),
+                  icon: const Icon(Icons.edit),
+                  tooltip: 'Edit',
+                ),
+                IconButton(
+                  onPressed: () => _deleteCategory(category, configService),
+                  icon: const Icon(Icons.delete),
+                  tooltip: 'Delete',
+                  color: Colors.red,
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildGoalsCard(ConfigService configService) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.flag,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Goals',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: () => _addGoal(configService),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (configService.goals.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'No goals set yet. Add your first goal to get started!',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            else
+              ...configService.goals.map((goal) => _buildGoalTile(goal, configService)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoalTile(Goal goal, ConfigService configService) {
+    final daysUntilDeadline = goal.deadline.difference(DateTime.now()).inDays;
+    final isOverdue = daysUntilDeadline < 0;
+    final isDueSoon = daysUntilDeadline <= 7 && daysUntilDeadline >= 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _parseColor(goal.color).withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            _getIconData(goal.icon),
+            color: _parseColor(goal.color),
+          ),
+        ),
+        title: Text(
+          goal.title,
+          style: TextStyle(
+            decoration: goal.isCompleted ? TextDecoration.lineThrough : null,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(goal.description),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 4,
+              children: goal.tags.map((tag) => Chip(
+                label: Text(tag),
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                labelStyle: Theme.of(context).textTheme.bodySmall,
+              )).toList(),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: isOverdue
+                      ? Colors.red
+                      : isDueSoon
+                          ? Colors.orange
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isOverdue
+                      ? 'Overdue by ${daysUntilDeadline.abs()} days'
+                      : isDueSoon
+                          ? 'Due in $daysUntilDeadline days'
+                          : 'Due ${goal.deadline.day}/${goal.deadline.month}/${goal.deadline.year}',
+                  style: TextStyle(
+                    color: isOverdue
+                        ? Colors.red
+                        : isDueSoon
+                            ? Colors.orange
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: isOverdue || isDueSoon ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Checkbox(
+              value: goal.isCompleted,
+              onChanged: (bool? value) {
+                if (value != null) {
+                  final updatedGoal = goal.copyWith(isCompleted: value);
+                  configService.updateGoal(updatedGoal);
+                }
+              },
+            ),
+            PopupMenuButton(
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _editGoal(goal, configService);
+                } else if (value == 'delete') {
+                  _deleteGoal(goal, configService);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getThemeModeName(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
+      case ThemeMode.system:
+        return 'System';
+    }
+  }
+
+  Color _parseColor(String colorString) {
+    try {
+      if (colorString.startsWith('#')) {
+        return Color(int.parse('FF${colorString.substring(1)}', radix: 16));
+      }
+      return Colors.grey;
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
+
+  IconData _getIconData(String iconName) {
+    return IconUtils.getIconData(iconName);
+  }
+
+  Future<void> _selectDataDirectory(ConfigService configService) async {
+    try {
+      final result = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Select Data Directory',
+      );
+      
+      if (result != null && mounted) {
+        await configService.setDataDirectory(result);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Data directory updated to: $result')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting directory: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _addCategory(ConfigService configService) async {
+    final result = await showDialog<TimeEntryCategory>(
+      context: context,
+      builder: (context) => const EditCategoryDialog(),
+    );
+    
+    if (result != null) {
+      await configService.addCategory(result);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Category "${result.name}" added')),
+        );
+      }
+    }
+  }
+
+  Future<void> _editCategory(TimeEntryCategory category, ConfigService configService) async {
+    final result = await showDialog<TimeEntryCategory>(
+      context: context,
+      builder: (context) => EditCategoryDialog(
+        category: category,
+        isEditing: true,
+      ),
+    );
+    
+    if (result != null) {
+      await configService.updateCategory(result);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Category "${result.name}" updated')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteCategory(TimeEntryCategory category, ConfigService configService) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Category'),
+        content: Text('Are you sure you want to delete "${category.name}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      try {
+        await configService.removeCategory(category.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Category "${category.name}" deleted')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting category: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _addGoal(ConfigService configService) async {
+    final result = await showDialog<Goal>(
+      context: context,
+      builder: (context) => const EditGoalDialog(),
+    );
+    
+    if (result != null) {
+      await configService.addGoal(result);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Goal "${result.title}" added')),
+        );
+      }
+    }
+  }
+
+  Future<void> _editGoal(Goal goal, ConfigService configService) async {
+    final result = await showDialog<Goal>(
+      context: context,
+      builder: (context) => EditGoalDialog(
+        goal: goal,
+        isEditing: true,
+      ),
+    );
+    
+    if (result != null) {
+      await configService.updateGoal(result);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Goal "${result.title}" updated')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteGoal(Goal goal, ConfigService configService) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Goal'),
+        content: Text('Are you sure you want to delete "${goal.title}"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      await configService.removeGoal(goal.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Goal "${goal.title}" deleted')),
+        );
+      }
     }
   }
 }

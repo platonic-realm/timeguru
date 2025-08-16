@@ -57,6 +57,9 @@ dependencies:
   shared_preferences: ^2.2.2
   path: ^1.9.1
   
+  # Excel handling
+  excel: ^2.1.0
+  
 
 
 dev_dependencies:

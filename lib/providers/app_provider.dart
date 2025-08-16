@@ -1,395 +1,500 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
+import '../models/monthly_file.dart';
 import '../models/time_entry.dart';
-import '../models/daily_summary.dart';
-import '../models/task.dart';
-import '../models/diary_entry.dart';
 import '../services/file_service.dart';
-import '../services/calendar_service.dart';
 import '../services/config_service.dart';
+import '../services/calendar_service.dart';
 
 class AppProvider extends ChangeNotifier {
-  final ConfigService _configService;
   final FileService _fileService;
+  final ConfigService _configService;
   final CalendarService _calendarService;
-  final Uuid _uuid = Uuid();
 
   // Current state
-  DateTime _selectedDate = DateTime.now();
+  int _currentYear = DateTime.now().year;
+  int _currentMonth = DateTime.now().month;
+  DateTime _selectedDate = DateTime.now(); // Global selected date
+  MonthlyFile? _currentMonthlyFile;
   List<TimeEntry> _timeEntries = [];
-  DailySummary? _currentDailySummary;
-  List<Task> _tasks = [];
-  List<DiaryEntry> _diaryEntries = [];
-
-  // Loading states
   bool _isLoading = false;
-  String? _errorMessage;
+  String? _error;
 
   AppProvider({
-    required ConfigService configService,
     required FileService fileService,
+    required ConfigService configService,
     required CalendarService calendarService,
-  }) : _configService = configService,
-       _fileService = fileService,
-       _calendarService = calendarService {
-    _loadInitialData();
-  }
+  }) : _fileService = fileService,
+       _configService = configService,
+       _calendarService = calendarService;
 
   // Getters
+  int get currentYear => _currentYear;
+  int get currentMonth => _currentMonth;
   DateTime get selectedDate => _selectedDate;
+  MonthlyFile? get currentMonthlyFile => _currentMonthlyFile;
   List<TimeEntry> get timeEntries => _timeEntries;
-  DailySummary? get currentDailySummary => _currentDailySummary;
-  List<Task> get tasks => _tasks;
-  List<DiaryEntry> get diaryEntries => _diaryEntries;
   bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-  String get dataDirectoryPath => _fileService.dataDirectoryPath;
-  ConfigService get configService => _configService;
+  String? get error => _error;
 
-  // Set selected date and reload data
-  Future<void> setSelectedDate(DateTime date) async {
-    _selectedDate = date;
-    notifyListeners();
-    await _loadDataForDate(date);
-  }
+  // Available years and months
+  List<int> get availableYears => _fileService.getAvailableYears();
+  List<int> get availableMonths => _fileService.getAvailableMonths(_currentYear);
 
-  // Load initial data
-  Future<void> _loadInitialData() async {
-    _setLoading(true);
+  // Initialize the provider
+  Future<void> initialize() async {
     try {
-      await _loadDataForDate(_selectedDate);
-      await _loadAllTasks();
-      _clearError();
+      _setLoading(true);
+      await _fileService.initialize();
+      
+      // Load current month
+      await loadMonth(_currentYear, _currentMonth);
+      
+      // Load current year's time entries
+      await loadTimeEntries(_currentYear);
+      
+      _setError(null);
     } catch (e) {
-      _setError('Failed to load initial data: $e');
+      _setError('Failed to initialize: $e');
+      debugPrint('NewAppProvider: Initialization error: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Load data for a specific date
-  Future<void> _loadDataForDate(DateTime date) async {
+  // Load a specific month
+  Future<void> loadMonth(int year, int month) async {
     try {
-      _timeEntries = await _fileService.loadTimeEntries(date);
-      _currentDailySummary = await _fileService.loadDailySummary(date);
-      _diaryEntries = await _fileService.loadDiaryEntries(date);
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to load data for ${date.toIso8601String()}: $e');
-    }
-  }
-
-  // Load all tasks
-  Future<void> _loadAllTasks() async {
-    try {
-      _tasks = await _fileService.loadAllTasks();
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to load tasks: $e');
-    }
-  }
-
-  // Time Entry Management
-  Future<void> addTimeEntry({
-    required String type,
-    required DateTime startTime,
-    required DateTime endTime,
-    required String description,
-    required String category,
-  }) async {
-    try {
-      final entry = TimeEntry(
-        id: _uuid.v4(),
-        date: _selectedDate,
-        type: type,
-        startTime: startTime,
-        endTime: endTime,
-        description: description,
-        category: category,
-        duration: endTime.difference(startTime),
-      );
-
-      await _fileService.saveTimeEntry(entry);
-      _timeEntries.add(entry);
+      _setLoading(true);
+      _setError(null);
       
-      // Update daily summary
-      await _updateDailySummary();
+      _currentYear = year;
+      _currentMonth = month;
       
-      // Add to calendar if enabled
-      await _calendarService.addTimeEntryToCalendar(entry);
+      // Load monthly file
+      _currentMonthlyFile = await _fileService.loadMonthlyFile(year, month);
       
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to add time entry: $e');
-    }
-  }
-
-  Future<void> updateTimeEntry(TimeEntry entry) async {
-    try {
-      await _fileService.saveTimeEntry(entry);
-      final index = _timeEntries.indexWhere((e) => e.id == entry.id);
-      if (index != -1) {
-        _timeEntries[index] = entry;
-        await _updateDailySummary();
-        notifyListeners();
-      }
-    } catch (e) {
-      _setError('Failed to update time entry: $e');
-    }
-  }
-
-  Future<void> deleteTimeEntry(String entryId) async {
-    try {
-      _timeEntries.removeWhere((e) => e.id == entryId);
-      
-      // Remove from calendar
-      await _calendarService.removeEventFromCalendar(entryId);
-      
-      await _updateDailySummary();
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to delete time entry: $e');
-    }
-  }
-
-  // Task Management
-  Future<void> addTask({
-    required String title,
-    required String description,
-    DateTime? dueDate,
-    TaskPriority priority = TaskPriority.medium,
-    String? project,
-    List<String> tags = const [],
-  }) async {
-    try {
-      final task = Task(
-        id: _uuid.v4(),
-        title: title,
-        description: description,
-        dueDate: dueDate,
-        priority: priority,
-        project: project,
-        tags: tags,
-        createdAt: DateTime.now(),
-      );
-
-      await _fileService.saveTask(task);
-      _tasks.add(task);
-      
-      // Add to calendar if has due date
-      if (dueDate != null) {
-        await _calendarService.addTaskToCalendar(task);
+      // If no monthly file exists, create a default one
+      if (_currentMonthlyFile == null) {
+        _currentMonthlyFile = _createDefaultMonthlyFile(year, month);
+        await _fileService.saveMonthlyFile(_currentMonthlyFile!);
       }
       
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to load month: $e');
+      debugPrint('NewAppProvider: Load month error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // Update the globally selected date
+  Future<void> updateSelectedDate(DateTime newDate) async {
+    if (_selectedDate.year != newDate.year || _selectedDate.month != newDate.month) {
+      // Load the new month if it's different
+      await loadMonth(newDate.year, newDate.month);
+    }
+    
+    _selectedDate = newDate;
+    notifyListeners();
+  }
+
+  // Go to today
+  Future<void> goToToday() async {
+    final today = DateTime.now();
+    await updateSelectedDate(today);
+  }
+
+  // Go to specific date
+  Future<void> goToDate(DateTime date) async {
+    await updateSelectedDate(date);
+  }
+
+  // Load time entries for a specific year
+  Future<void> loadTimeEntries(int year) async {
+    try {
+      _timeEntries = await _fileService.loadTimeEntries(year);
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to load time entries: $e');
+      debugPrint('NewAppProvider: Load time entries error: $e');
+    }
+  }
+
+  // Create a new monthly file
+  MonthlyFile _createDefaultMonthlyFile(int year, int month) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    
+    return MonthlyFile(
+      year: year,
+      month: month,
+      overview: MonthlyOverview(
+        totalDays: daysInMonth,
+        completedTasks: 0,
+        totalTasks: 0,
+        studyHours: Duration.zero,
+        workHours: Duration.zero,
+        familyHours: Duration.zero,
+        quotidianHours: Duration.zero,
+        idleHours: Duration.zero,
+      ),
+      tasks: [],
+      dailyEntries: [],
+    );
+  }
+
+  // TASK MANAGEMENT
+  
+  Future<void> addTask(MonthlyTask task) async {
+    try {
+      if (_currentMonthlyFile == null) return;
+      
+      final updatedTasks = List<MonthlyTask>.from(_currentMonthlyFile!.tasks);
+      updatedTasks.add(task);
+      
+      _currentMonthlyFile = MonthlyFile(
+        year: _currentMonthlyFile!.year,
+        month: _currentMonthlyFile!.month,
+        overview: _currentMonthlyFile!.overview,
+        tasks: updatedTasks,
+        dailyEntries: _currentMonthlyFile!.dailyEntries,
+      );
+      
+      await _fileService.saveMonthlyFile(_currentMonthlyFile!);
+      _updateOverview();
       notifyListeners();
     } catch (e) {
       _setError('Failed to add task: $e');
+      debugPrint('NewAppProvider: Add task error: $e');
     }
   }
 
-  Future<void> updateTask(Task task) async {
+  Future<void> updateTask(MonthlyTask updatedTask) async {
     try {
-      await _fileService.saveTask(task);
-      final index = _tasks.indexWhere((t) => t.id == task.id);
-      if (index != -1) {
-        _tasks[index] = task;
-        notifyListeners();
-      }
+      if (_currentMonthlyFile == null) return;
+      
+      final updatedTasks = _currentMonthlyFile!.tasks.map((task) {
+        return task.id == updatedTask.id ? updatedTask : task;
+      }).toList();
+      
+      _currentMonthlyFile = MonthlyFile(
+        year: _currentMonthlyFile!.year,
+        month: _currentMonthlyFile!.month,
+        overview: _currentMonthlyFile!.overview,
+        tasks: updatedTasks,
+        dailyEntries: _currentMonthlyFile!.dailyEntries,
+      );
+      
+      await _fileService.saveMonthlyFile(_currentMonthlyFile!);
+      _updateOverview();
+      notifyListeners();
     } catch (e) {
       _setError('Failed to update task: $e');
+      debugPrint('NewAppProvider: Update task error: $e');
     }
   }
 
   Future<void> deleteTask(String taskId) async {
     try {
-      await _fileService.deleteTask(taskId);
-      _tasks.removeWhere((t) => t.id == taskId);
+      if (_currentMonthlyFile == null) return;
       
-      // Remove from calendar
-      await _calendarService.removeEventFromCalendar(taskId);
+      final updatedTasks = _currentMonthlyFile!.tasks.where((task) => task.id != taskId).toList();
       
+      _currentMonthlyFile = MonthlyFile(
+        year: _currentMonthlyFile!.year,
+        month: _currentMonthlyFile!.month,
+        overview: _currentMonthlyFile!.overview,
+        tasks: updatedTasks,
+        dailyEntries: _currentMonthlyFile!.dailyEntries,
+      );
+      
+      await _fileService.saveMonthlyFile(_currentMonthlyFile!);
+      _updateOverview();
       notifyListeners();
     } catch (e) {
       _setError('Failed to delete task: $e');
+      debugPrint('NewAppProvider: Delete task error: $e');
     }
   }
 
-  Future<void> completeTask(String taskId) async {
+  // DAILY ENTRY MANAGEMENT
+  
+  Future<void> addDailyEntry(DailyEntry entry) async {
     try {
-      final index = _tasks.indexWhere((t) => t.id == taskId);
-      if (index != -1) {
-        final task = _tasks[index].copyWith(
-          status: TaskStatus.completed,
-          completedAt: DateTime.now(),
-        );
-        await updateTask(task);
-      }
-    } catch (e) {
-      _setError('Failed to complete task: $e');
-    }
-  }
-
-  // Diary Management
-  Future<void> addDiaryEntry({
-    required String title,
-    required String content,
-    required DiaryEntryType type,
-    List<String> tags = const [],
-  }) async {
-    try {
-      final entry = DiaryEntry(
-        id: _uuid.v4(),
-        date: _selectedDate,
-        title: title,
-        content: content,
-        type: type,
-        tags: tags,
-        createdAt: DateTime.now(),
+      if (_currentMonthlyFile == null) return;
+      
+      final updatedEntries = List<DailyEntry>.from(_currentMonthlyFile!.dailyEntries);
+      updatedEntries.add(entry);
+      
+      _currentMonthlyFile = MonthlyFile(
+        year: _currentMonthlyFile!.year,
+        month: _currentMonthlyFile!.month,
+        overview: _currentMonthlyFile!.overview,
+        tasks: _currentMonthlyFile!.tasks,
+        dailyEntries: updatedEntries,
       );
-
-      await _fileService.saveDiaryEntry(entry);
-      _diaryEntries.add(entry);
       
-      if (type == DiaryEntryType.monthly) {
-        await _fileService.saveMonthlyMemo(entry);
-      }
-      
+      await _fileService.saveMonthlyFile(_currentMonthlyFile!);
       notifyListeners();
     } catch (e) {
-      _setError('Failed to add diary entry: $e');
+      _setError('Failed to add daily entry: $e');
+      debugPrint('NewAppProvider: Add daily entry error: $e');
     }
   }
 
-  Future<void> updateDiaryEntry(DiaryEntry entry) async {
+  Future<void> updateDailyEntry(DailyEntry updatedEntry) async {
     try {
-      await _fileService.saveDiaryEntry(entry);
-      final index = _diaryEntries.indexWhere((e) => e.id == entry.id);
+      if (_currentMonthlyFile == null) return;
+      
+      final updatedEntries = _currentMonthlyFile!.dailyEntries.map((entry) {
+        return entry.date.isAtSameMomentAs(updatedEntry.date) ? updatedEntry : entry;
+      }).toList();
+      
+      _currentMonthlyFile = MonthlyFile(
+        year: _currentMonthlyFile!.year,
+        month: _currentMonthlyFile!.month,
+        overview: _currentMonthlyFile!.overview,
+        tasks: _currentMonthlyFile!.tasks,
+        dailyEntries: updatedEntries,
+      );
+      
+      await _fileService.saveMonthlyFile(_currentMonthlyFile!);
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to update daily entry: $e');
+      debugPrint('NewAppProvider: Update daily entry error: $e');
+    }
+  }
+
+  Future<void> deleteDailyEntry(DateTime date) async {
+    try {
+      if (_currentMonthlyFile == null) return;
+      
+      final updatedEntries = _currentMonthlyFile!.dailyEntries
+          .where((entry) => !entry.date.isAtSameMomentAs(date))
+          .toList();
+      
+      _currentMonthlyFile = MonthlyFile(
+        year: _currentMonthlyFile!.year,
+        month: _currentMonthlyFile!.month,
+        overview: _currentMonthlyFile!.overview,
+        tasks: _currentMonthlyFile!.tasks,
+        dailyEntries: updatedEntries,
+      );
+      
+      await _fileService.saveMonthlyFile(_currentMonthlyFile!);
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to delete daily entry: $e');
+      debugPrint('NewAppProvider: Delete daily entry error: $e');
+    }
+  }
+
+  // TIME ENTRY MANAGEMENT
+  
+  Future<void> addTimeEntry(TimeEntry entry) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+      
+      // Add to local list
+      _timeEntries.add(entry);
+      
+      // Save to file
+      await _fileService.saveTimeEntries(_currentYear, _timeEntries);
+      
+      // Update calendar if enabled
+      if (_configService.config.autoSyncCalendar) {
+        await _calendarService.addTimeEntryToCalendar(entry);
+      }
+      
+      _setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to add time entry: $e');
+      debugPrint('AppProvider: Add time entry error: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> updateTimeEntry(TimeEntry entry) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+      
+      // Update in local list
+      final index = _timeEntries.indexWhere((e) => e.id == entry.id);
       if (index != -1) {
-        _diaryEntries[index] = entry;
+        _timeEntries[index] = entry;
+        
+        // Save to file
+        await _fileService.saveTimeEntries(_currentYear, _timeEntries);
+        
+        // Update calendar if enabled
+        if (_configService.config.autoSyncCalendar) {
+          await _calendarService.updateTimeEntryInCalendar(entry);
+        }
+        
+        _setLoading(false);
         notifyListeners();
       }
     } catch (e) {
-      _setError('Failed to update diary entry: $e');
+      _setError('Failed to update time entry: $e');
+      debugPrint('AppProvider: Update time entry error: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> deleteDiaryEntry(String id) async {
+  Future<void> deleteTimeEntry(String id) async {
     try {
-      await _fileService.deleteDiaryEntry(id);
-      _diaryEntries.removeWhere((e) => e.id == id);
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to delete diary entry: $e');
-    }
-  }
-
-  // Daily Summary Management
-  Future<void> _updateDailySummary() async {
-    try {
-      // Calculate totals from time entries
-      Duration idle = Duration.zero;
-      Duration study = Duration.zero;
-      Duration work = Duration.zero;
-      Duration quotidian = Duration.zero;
-      Duration family = Duration.zero;
-      Duration unknown = Duration.zero;
-
-      for (final entry in _timeEntries) {
-        switch (entry.category.toLowerCase()) {
-          case 'idle':
-            idle += entry.duration;
-            break;
-          case 'study':
-            study += entry.duration;
-            break;
-          case 'work':
-            work += entry.duration;
-            break;
-          case 'quotidian':
-            quotidian += entry.duration;
-            break;
-          case 'family':
-            family += entry.duration;
-            break;
-          default:
-            unknown += entry.duration;
-            break;
-        }
+      _setLoading(true);
+      _setError(null);
+      
+      // Remove from local list
+      _timeEntries.removeWhere((e) => e.id == id);
+      
+      // Save to file
+      await _fileService.saveTimeEntries(_currentYear, _timeEntries);
+      
+      // Remove from calendar if enabled
+      if (_configService.config.autoSyncCalendar) {
+        await _calendarService.removeTimeEntryFromCalendar(id);
       }
-
-      final total = idle + study + work + quotidian + family + unknown;
-
-      final summary = DailySummary(
-        id: _currentDailySummary?.id ?? _uuid.v4(),
-        date: _selectedDate,
-        idle: idle,
-        study: study,
-        work: work,
-        quotidian: quotidian,
-        family: family,
-        unknown: unknown,
-        total: total,
-      );
-
-      await _fileService.saveDailySummary(summary);
-      _currentDailySummary = summary;
+      
+      _setLoading(false);
       notifyListeners();
     } catch (e) {
-      _setError('Failed to update daily summary: $e');
+      _setError('Failed to delete time entry: $e');
+      debugPrint('AppProvider: Delete time entry error: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
-  // Settings
-  Future<void> setDataDirectory(String path) async {
-    try {
-      await _fileService.setDataDirectory(path);
-      // Reload all data from the new directory
-      await _loadInitialData();
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to set data directory: $e');
-    }
-  }
+  // OVERVIEW MANAGEMENT
   
-  Future<void> reloadDataDirectory() async {
-    try {
-      await _fileService.reloadDataDirectory();
-      await _loadInitialData();
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to reload data directory: $e');
+  void _updateOverview() {
+    if (_currentMonthlyFile == null) return;
+    
+    final totalTasks = _currentMonthlyFile!.tasks.length;
+    final completedTasks = _currentMonthlyFile!.tasks.where((task) => task.isCompleted).length;
+    
+    // Calculate hours from time entries for current month
+    final monthEntries = _timeEntries.where((entry) {
+      return entry.date.year == _currentYear && entry.date.month == _currentMonth;
+    }).toList();
+    
+    Duration studyHours = Duration.zero;
+    Duration workHours = Duration.zero;
+    Duration familyHours = Duration.zero;
+    Duration quotidianHours = Duration.zero;
+    Duration idleHours = Duration.zero;
+    
+    for (final entry in monthEntries) {
+      switch (entry.category.toLowerCase()) {
+        case 'study':
+          studyHours += entry.duration;
+          break;
+        case 'work':
+          workHours += entry.duration;
+          break;
+        case 'family':
+          familyHours += entry.duration;
+          break;
+        case 'quotidian':
+          quotidianHours += entry.duration;
+          break;
+        case 'idle':
+          idleHours += entry.duration;
+          break;
+      }
     }
+    
+    final daysInMonth = DateTime(_currentYear, _currentMonth + 1, 0).day;
+    
+    final updatedOverview = MonthlyOverview(
+      totalDays: daysInMonth,
+      completedTasks: completedTasks,
+      totalTasks: totalTasks,
+      studyHours: studyHours,
+      workHours: workHours,
+      familyHours: familyHours,
+      quotidianHours: quotidianHours,
+      idleHours: idleHours,
+    );
+    
+    _currentMonthlyFile = MonthlyFile(
+      year: _currentMonthlyFile!.year,
+      month: _currentMonthlyFile!.month,
+      overview: updatedOverview,
+      tasks: _currentMonthlyFile!.tasks,
+      dailyEntries: _currentMonthlyFile!.dailyEntries,
+    );
   }
 
-  // Export functionality
-  Future<void> exportData(String exportPath) async {
-    try {
-      await _fileService.exportData(exportPath);
-      await _calendarService.exportICalFiles(_timeEntries, _tasks, exportPath);
-    } catch (e) {
-      _setError('Failed to export data: $e');
-    }
-  }
-
-  // Utility methods
+  // UTILITY METHODS
+  
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
-  void _setError(String message) {
-    _errorMessage = message;
+  void _setError(String? error) {
+    _error = error;
     notifyListeners();
   }
 
-  void _clearError() {
-    _errorMessage = null;
-    notifyListeners();
+  void clearError() {
+    _setError(null);
   }
 
-  // Refresh data
-  Future<void> refresh() async {
-    await _loadDataForDate(_selectedDate);
-    await _loadAllTasks();
+  // Get daily entry for a specific date
+  DailyEntry? getDailyEntry(DateTime date) {
+    if (_currentMonthlyFile == null) return null;
+    
+    return _currentMonthlyFile!.dailyEntries.firstWhere(
+      (entry) => entry.date.year == date.year && 
+                  entry.date.month == date.month && 
+                  entry.date.day == date.day,
+      orElse: () => DailyEntry(
+        date: date,
+        content: '',
+        tags: [],
+      ),
+    );
+  }
+
+  // Get tasks for a specific project
+  List<MonthlyTask> getTasksByProject(String? project) {
+    if (_currentMonthlyFile == null) return [];
+    
+    if (project == null) return _currentMonthlyFile!.tasks;
+    
+    return _currentMonthlyFile!.tasks.where((task) => task.project == project).toList();
+  }
+
+  // Get tasks by priority
+  List<MonthlyTask> getTasksByPriority(String priority) {
+    if (_currentMonthlyFile == null) return [];
+    
+    return _currentMonthlyFile!.tasks.where((task) => task.priority == priority).toList();
+  }
+
+  // SETTINGS METHODS
+  
+  ConfigService get configService => _configService;
+  String get dataDirectoryPath => _fileService.dataDirectoryPath;
+  
+  Future<void> setDataDirectory(String path) async {
+    try {
+      await _fileService.initialize();
+      // The FileService will use the config service to set the directory
+      // This method is mainly for compatibility with the settings screen
+    } catch (e) {
+      _setError('Failed to set data directory: $e');
+      debugPrint('AppProvider: Set data directory error: $e');
+    }
   }
 }

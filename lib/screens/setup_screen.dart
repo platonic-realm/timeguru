@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../services/file_service.dart';
 import '../services/config_service.dart';
 
 class SetupScreen extends StatefulWidget {
@@ -262,43 +261,36 @@ class _SetupScreenState extends State<SetupScreen> {
   }
 
   Future<void> _completeSetup() async {
-    if (_selectedPath == null) return;
-    
+    if (_selectedPath == null) {
+      debugPrint('SetupScreen: No path selected');
+      return;
+    }
+
     setState(() {
       _isConfiguring = true;
       _errorMessage = null;
     });
-    
+
     try {
-      // Use the main app's ConfigService instance
-      await widget.configService.initialize();
-      final tempFileService = FileService(widget.configService);
-      await tempFileService.setDataDirectory(_selectedPath!);
+      debugPrint('SetupScreen: Starting setup with path: $_selectedPath');
+      debugPrint('SetupScreen: ConfigService initialized: ${widget.configService.isInitialized}');
       
-      // If successful, notify parent to reinitialize
+      // Save the selected directory to the main app's ConfigService
+      await widget.configService.setDataDirectory(_selectedPath!);
+      
+      debugPrint('SetupScreen: Data directory saved successfully: $_selectedPath');
+      debugPrint('SetupScreen: Current data directory: ${widget.configService.dataDirectory}');
+      
+      // Notify the parent that setup is complete
       if (mounted) {
-        debugPrint('SetupScreen: Setup completed successfully, calling onSetupComplete callback');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Setup completed successfully! Starting TimeGuru...'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        
-        // Wait a moment for the snackbar to show, then notify parent
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            debugPrint('SetupScreen: Executing onSetupComplete callback');
-            widget.onSetupComplete();
-          }
-        });
+        debugPrint('SetupScreen: Calling onSetupComplete callback');
+        widget.onSetupComplete();
       }
     } catch (e) {
+      debugPrint('SetupScreen: Error completing setup: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Failed to setup directory: $e';
+          _errorMessage = 'Error saving directory: $e';
           _isConfiguring = false;
         });
       }

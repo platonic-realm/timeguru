@@ -90,6 +90,18 @@ class CalendarService {
     return true;
   }
 
+  Future<bool> updateTimeEntryInCalendar(TimeEntry entry) async {
+    // For now, just return success - focus on iCal generation
+    debugPrint('Time entry would be updated in calendar: ${entry.description}');
+    return true;
+  }
+
+  Future<bool> removeTimeEntryFromCalendar(String entryId) async {
+    // For now, just return success - focus on iCal generation
+    debugPrint('Time entry would be removed from calendar: $entryId');
+    return true;
+  }
+
   // Export iCal files to a directory
   Future<void> exportICalFiles(List<TimeEntry> timeEntries, List<Task> tasks, String exportPath) async {
     final exportDir = Directory(exportPath);
