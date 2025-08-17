@@ -1,6 +1,6 @@
 # TimeGuru
 
-A comprehensive personal time tracking, task management, and diary application built with Flutter. TimeGuru is designed to work seamlessly with your existing file-based workflow and integrates with Obsidian and calendar applications.
+A comprehensive personal time tracking, task management, and diary application built with Flutter. TimeGuru is designed to work seamlessly with your existing file-based workflow and integrates with Obsidian and calendar applications. Features modern responsive design with dynamic layouts and theme management.
 
 ## Features
 
@@ -26,6 +26,13 @@ A comprehensive personal time tracking, task management, and diary application b
 - **Device Calendar Sync**: Automatically sync activities and tasks with your device calendar
 - **iCal Export**: Generate standard iCal files for external calendar applications
 - **Event Management**: Create calendar events for time entries and task deadlines
+
+### 🎨 Modern UI & Responsive Design
+- **Dynamic Theme Management**: Light, dark, and system theme modes with instant switching
+- **Responsive Layouts**: Adaptive layouts that automatically switch between horizontal and vertical orientations
+- **Smart Grid System**: Rectangular overview items that efficiently use screen space
+- **Dynamic Height Calculation**: Intelligent container sizing based on content and screen dimensions
+- **Cross-Platform Optimization**: Optimized for both mobile and desktop experiences
 
 ### 💾 File-Based Storage
 - **Human-Readable Format**: All data stored in JSON and Markdown formats
@@ -99,6 +106,16 @@ A comprehensive personal time tracking, task management, and diary application b
 3. Write your reflections in Markdown format
 4. Add relevant tags for organization
 
+### Responsive Design Features
+
+TimeGuru automatically adapts to different screen sizes and orientations:
+
+- **Layout Switching**: Automatically switches between horizontal and vertical layouts based on available space
+- **Dynamic Sizing**: Font sizes, spacing, and icon sizes adjust based on screen dimensions
+- **Smart Grid**: Overview items use rectangular layout (2.5:1 aspect ratio) for efficient space usage
+- **Adaptive Containers**: Page containers dynamically resize based on content requirements
+- **Theme Persistence**: Theme preferences are saved and restored across app sessions
+
 ### Calendar Integration
 
 - **Auto-sync**: Enable automatic calendar sync in Settings
@@ -116,20 +133,33 @@ A comprehensive personal time tracking, task management, and diary application b
 The app creates the following directory structure in your data folder:
 
 ```
-TimeGuru/
-├── time_entries/          # Individual time tracking entries
-├── daily_summaries/       # Daily time summaries
-├── tasks/                 # Task definitions and status
-├── diary/                 # Daily diary entries
-├── monthly/               # Monthly memos
-└── memos/                 # General memos and notes
+DataDirectory/
+├── 2025/                    # Year-based directories
+│   ├── 08.md               # Monthly markdown file (August 2025)
+│   └── 2025.xlsx           # Year summary in Excel format
+├── 2026/                    # Next year directory
+│   ├── 08.md               # Monthly markdown file
+│   └── 2026.xlsx           # Year summary
+├── 2027/                    # Future year directories
+│   ├── 08.md
+│   └── 2027.xlsx
+└── 2028/
+    ├── 08.md
+    └── 2028.xlsx
 ```
+
+### File Organization
+
+- **Year Directories**: Each year gets its own directory (e.g., `2025/`, `2026/`)
+- **Monthly Files**: Markdown files named by month (e.g., `08.md` for August)
+- **Excel Summaries**: Yearly overview files in Excel format for data analysis
+- **Markdown Content**: Monthly files contain overview, tasks, and daily entries
 
 ### File Formats
 
-- **JSON Files**: App data storage (time entries, tasks, summaries)
-- **Markdown Files**: Diary entries and memos with Obsidian-compatible frontmatter
-- **iCal Files**: Calendar exports for external applications
+- **Markdown Files (.md)**: Monthly overview with tasks and daily entries in Obsidian-compatible format
+- **Excel Files (.xlsx)**: Yearly summaries and data analysis
+- **JSON Configuration**: App settings and preferences stored in user config directory
 
 ## Configuration
 
@@ -193,20 +223,22 @@ TimeGuru is designed to work seamlessly with Obsidian:
 lib/
 ├── models/           # Data models and serialization
 ├── providers/        # State management with Provider
-├── screens/          # Main app screens
+├── screens/          # Main app screens with responsive layouts
 ├── services/         # File and calendar services
+├── utils/            # Responsive utilities and helper functions
 ├── widgets/          # Reusable UI components
-└── main.dart         # App entry point
+└── main.dart         # App entry point with theme management
 ```
 
 ### Key Dependencies
 
-- **Provider**: State management
+- **Provider**: State management and theme persistence
 - **Path Provider**: File system access
 - **Device Calendar**: Calendar integration
 - **File Picker**: Directory selection
 - **Intl**: Date/time formatting
 - **JSON Serializable**: Data serialization
+- **Responsive Utils**: Dynamic sizing and layout management
 
 ### Building for Production
 
@@ -217,6 +249,26 @@ flutter build apk --release
 # Linux AppImage
 flutter build linux --release
 ```
+
+## Recent Improvements
+
+### 🚀 Performance & Layout Optimizations
+- **Overflow Resolution**: Eliminated RenderFlex overflow issues through intelligent height calculations
+- **Dynamic Layout System**: Implemented LayoutBuilder-based responsive design that adapts to content
+- **Fixed Height Containers**: Consistent page container heights for better user experience
+- **Rectangular Grid Items**: Optimized overview grid with 2.5:1 aspect ratio for space efficiency
+
+### 🎨 Theme & UI Enhancements
+- **Instant Theme Switching**: Real-time theme changes with proper state management
+- **Provider Architecture**: Robust state management using Provider pattern
+- **Responsive Typography**: Dynamic font sizing based on screen dimensions
+- **Adaptive Spacing**: Intelligent spacing that scales with device capabilities
+
+### 📱 Responsive Design Features
+- **Layout Orientation**: Automatic switching between horizontal and vertical layouts
+- **Screen Size Adaptation**: Optimized layouts for mobile, tablet, and desktop
+- **Content-Aware Sizing**: Containers that adjust based on actual content requirements
+- **Cross-Platform Consistency**: Unified experience across different device types
 
 ## Contributing
 
@@ -236,7 +288,8 @@ For support and questions:
 - Create an issue on GitHub
 - Check the troubleshooting section
 - Review the documentation
+- **Responsive Design**: For layout and sizing issues, check the responsive design features section
 
 ---
 
-**TimeGuru** - Your personal time management companion with file-based flexibility and powerful integrations.
+**TimeGuru** - Your personal time management companion with file-based flexibility, powerful integrations, and modern responsive design.
