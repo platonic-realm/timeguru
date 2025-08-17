@@ -31,6 +31,7 @@ class _YearlyScreenState extends State<YearlyScreen> {
     
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Consumer<AppProvider>(
           builder: (context, provider, child) {
             return GestureDetector(

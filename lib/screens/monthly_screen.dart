@@ -123,6 +123,7 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
 
         return Scaffold(
           appBar: AppBar(
+              centerTitle: true,
               title: GestureDetector(
                 onTap: () => _showDatePicker(context, provider),
                 child: Container(

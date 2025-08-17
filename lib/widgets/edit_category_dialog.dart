@@ -53,10 +53,14 @@ class _EditCategoryDialogState extends State<EditCategoryDialog> {
   Color _parseColor(String colorString) {
     try {
       if (colorString.startsWith('#')) {
-        return Color(int.parse('FF${colorString.substring(1)}', radix: 16));
+        final hexString = colorString.substring(1);
+        if (hexString.length == 6) {
+          return Color(int.parse('FF$hexString', radix: 16));
+        }
       }
       return Colors.red;
     } catch (e) {
+      debugPrint('Error parsing color: $e');
       return Colors.red;
     }
   }
@@ -188,9 +192,12 @@ class _EditCategoryDialogState extends State<EditCategoryDialog> {
   void _showColorPicker(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (context) => AlertDialog(
         title: const Text('Pick a Color'),
-        content: SingleChildScrollView(
+        content: SizedBox(
+          width: 300,
+          height: 300,
           child: ColorPicker(
             pickerColor: _selectedColor,
             onColorChanged: (color) {
@@ -199,11 +206,14 @@ class _EditCategoryDialogState extends State<EditCategoryDialog> {
                 _colorController.text = _colorToHex(color);
               });
             },
-            pickerAreaHeightPercent: 0.8,
           ),
         ),
         actions: [
           TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('OK'),
           ),
@@ -228,17 +238,36 @@ class _EditCategoryDialogState extends State<EditCategoryDialog> {
 }
 
 // Simple Color Picker Widget
-class ColorPicker extends StatelessWidget {
+class ColorPicker extends StatefulWidget {
   final Color pickerColor;
   final ValueChanged<Color> onColorChanged;
-  final double pickerAreaHeightPercent;
 
   const ColorPicker({
     super.key,
     required this.pickerColor,
     required this.onColorChanged,
-    this.pickerAreaHeightPercent = 0.8,
   });
+
+  @override
+  State<ColorPicker> createState() => _ColorPickerState();
+}
+
+class _ColorPickerState extends State<ColorPicker> {
+  late Color _selectedColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedColor = widget.pickerColor;
+  }
+
+  @override
+  void didUpdateWidget(ColorPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pickerColor != widget.pickerColor) {
+      _selectedColor = widget.pickerColor;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -250,20 +279,20 @@ class ColorPicker extends StatelessWidget {
       Colors.brown, Colors.grey, Colors.blueGrey, Colors.black,
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: colors.length,
-      itemBuilder: (context, index) {
-        final color = colors[index];
-        final isSelected = color == pickerColor;
+    return GridView.count(
+      crossAxisCount: 5,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      children: colors.map((color) {
+        final isSelected = color == _selectedColor;
         
         return GestureDetector(
-          onTap: () => onColorChanged(color),
+          onTap: () {
+            setState(() {
+              _selectedColor = color;
+            });
+            widget.onColorChanged(color);
+          },
           child: Container(
             decoration: BoxDecoration(
               color: color,
@@ -278,7 +307,7 @@ class ColorPicker extends StatelessWidget {
                 : null,
           ),
         );
-      },
+      }).toList(),
     );
   }
 }

@@ -39,6 +39,7 @@ class _DailyScreenState extends State<DailyScreen> {
     
     return Scaffold(
       appBar: AppBar(
+        centerTitle: true,
         title: Consumer<AppProvider>(
           builder: (context, provider, child) {
             return GestureDetector(
