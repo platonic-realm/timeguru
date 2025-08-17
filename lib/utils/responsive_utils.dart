@@ -111,7 +111,7 @@ class ResponsiveUtils {
     if (isSmallScreen) return 2;
     if (isMobile) return 2;
     if (isTablet) return 3;
-    if (isLargeScreen) return 4;
+    if (isLargeScreen) return 3;
     return 3;
   }
 
@@ -125,12 +125,12 @@ class ResponsiveUtils {
 
   // Responsive summary heights
   static double getResponsiveSummaryHeight() {
-    final baseHeight = screenHeight * 0.35;
+    final baseHeight = screenHeight * 0.60;
     if (isSmallScreen) return baseHeight.clamp(250.0, 350.0);
     if (isMobile) return baseHeight.clamp(280.0, 380.0);
     if (isTablet) return baseHeight.clamp(320.0, 420.0);
     if (isLargeScreen) return baseHeight.clamp(350.0, 450.0);
-    return baseHeight.clamp(280.0, 400.0);
+    return baseHeight.clamp(280.0, 600.0);
   }
 
   // Responsive container heights

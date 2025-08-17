@@ -249,17 +249,119 @@ class AppConfig {
 }
 
 class ConfigService extends ChangeNotifier {
-  static const String _configFileName = 'TimeGuru.json';
+  static const String _configFileName = 'timeguru.json';
   AppConfig _config = const AppConfig();
-  bool _isInitialized = false;
   FileService? _fileService;
+  bool _isInitialized = false;
+  
+  // Separate lists for default and year-specific data
+  List<TimeEntryCategory> _defaultCategories = [];
+  List<Goal> _defaultGoals = [];
+  List<TimeEntryCategory> _yearCategories = [];
+  List<Goal> _yearGoals = [];
 
-  AppConfig get config => _config;
+  // Getters
   bool get isInitialized => _isInitialized;
   String? get dataDirectory => _config.dataDirectory;
   ThemeMode get themeMode => _config.themeMode;
-  List<TimeEntryCategory> get categories => _config.categories;
-  List<Goal> get goals => _config.goals;
+  bool get autoSyncCalendar => _config.autoSyncCalendar;
+  bool get createICalFiles => _config.createICalFiles;
+  
+  // Get default categories and goals (from JSON config)
+  List<TimeEntryCategory> get defaultCategories => _defaultCategories;
+  List<Goal> get defaultGoals => _defaultGoals;
+  
+  // Get year-specific categories and goals (from Excel files)
+  List<TimeEntryCategory> get yearCategories => _yearCategories;
+  List<Goal> get yearGoals => _yearGoals;
+  
+  // For backward compatibility, return year-specific data as the main categories/goals
+  List<TimeEntryCategory> get categories => _yearCategories;
+  List<Goal> get goals => _yearGoals;
+  
+  // Get year-specific categories and goals
+  List<TimeEntryCategory> getYearCategories(int year) {
+    // This will be loaded from Excel files
+    return [];
+  }
+  
+  List<Goal> getYearGoals(int year) {
+    // This will be loaded from Excel files
+    return [];
+  }
+
+  // Load year-specific data (categories and goals) from Excel
+  Future<void> loadYearData(int year) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      
+      // Load year-specific categories and goals
+      final yearCategories = await _fileService!.loadYearCategories(year);
+      final yearGoals = await _fileService!.loadYearGoals(year);
+      
+      _yearCategories = yearCategories;
+      _yearGoals = yearGoals;
+      
+      notifyListeners();
+      debugPrint('ConfigService: Loaded year $year data - ${yearCategories.length} categories, ${yearGoals.length} goals');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to load year $year data: $e');
+      // If loading fails, create the year file with default data
+      await createYearFile(year);
+      
+      // After creating, try to load again
+      try {
+        final yearCategories = await _fileService!.loadYearCategories(year);
+        final yearGoals = await _fileService!.loadYearGoals(year);
+        
+        _yearCategories = yearCategories;
+        _yearGoals = yearGoals;
+        
+        notifyListeners();
+        debugPrint('ConfigService: Loaded year $year data after creation - ${yearCategories.length} categories, ${yearGoals.length} goals');
+      } catch (e2) {
+        debugPrint('ConfigService: Failed to load year $year data after creation: $e2');
+      }
+    }
+  }
+
+  // Create a new year file with default categories and goals
+  Future<void> createYearFile(int year) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      // Use default categories and goals as templates
+      await _fileService!.createYearFile(year, _defaultCategories, _defaultGoals);
+      debugPrint('ConfigService: Created year $year file with ${_defaultCategories.length} default categories and ${_defaultGoals.length} default goals');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to create year $year file: $e');
+    }
+  }
+
+  // Save year-specific categories
+  Future<void> saveYearCategories(int year, List<TimeEntryCategory> categories) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      await _fileService!.saveYearCategories(year, categories);
+      debugPrint('ConfigService: Saved ${categories.length} categories for year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to save categories for year $year: $e');
+    }
+  }
+
+  // Save year-specific goals
+  Future<void> saveYearGoals(int year, List<Goal> goals) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      await _fileService!.saveYearGoals(year, goals);
+      debugPrint('ConfigService: Saved ${goals.length} goals for year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to save goals for year $year: $e');
+    }
+  }
 
   void setFileService(FileService fileService) {
     _fileService = fileService;
@@ -288,26 +390,50 @@ class ConfigService extends ChangeNotifier {
       final content = await configFile.readAsString();
       final json = jsonDecode(content) as Map<String, dynamic>;
       _config = AppConfig.fromJson(json);
+      
+      // Load default categories and goals from config
+      _defaultCategories = List<TimeEntryCategory>.from(_config.categories);
+      _defaultGoals = List<Goal>.from(_config.goals);
+      
+      debugPrint('ConfigService: Loaded ${_defaultCategories.length} default categories and ${_defaultGoals.length} default goals from config');
     } else {
       // Create default config
       _config = const AppConfig();
+      _defaultCategories = List<TimeEntryCategory>.from(_config.categories);
+      _defaultGoals = List<Goal>.from(_config.goals);
       await _saveConfig();
+      debugPrint('ConfigService: Created default config with ${_defaultCategories.length} categories and ${_defaultGoals.length} goals');
     }
   }
 
   Future<void> _saveConfig() async {
-    final configFile = await _getConfigFile();
-    final json = _config.toJson();
-    final content = jsonEncode(json);
-    await configFile.writeAsString(content);
+    try {
+      final configFile = await _getConfigFile();
+      final json = _config.toJson();
+      final content = jsonEncode(json);
+      await configFile.writeAsString(content);
+      debugPrint('ConfigService: Successfully saved config to ${configFile.path}');
+      debugPrint('ConfigService: Config contains ${_config.categories.length} categories and ${_config.goals.length} goals');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to save config: $e');
+      rethrow;
+    }
   }
 
   Future<File> _getConfigFile() async {
     final configDir = Directory('${Platform.environment['HOME']}/.config');
+    debugPrint('ConfigService: Config directory path: ${configDir.path}');
+    
     if (!await configDir.exists()) {
       await configDir.create(recursive: true);
+      debugPrint('ConfigService: Created config directory');
     }
-    return File('${configDir.path}/$_configFileName');
+    
+    final configFile = File('${configDir.path}/$_configFileName');
+    debugPrint('ConfigService: Config file path: ${configFile.path}');
+    debugPrint('ConfigService: Config file exists: ${await configFile.exists()}');
+    
+    return configFile;
   }
 
   Future<void> setDataDirectory(String directory) async {
@@ -317,26 +443,12 @@ class ConfigService extends ChangeNotifier {
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
+    debugPrint('ConfigService: Setting theme mode to ${mode.name}');
     _config = _config.copyWith(themeMode: mode);
     await _saveConfig();
+    debugPrint('ConfigService: Theme mode saved, notifying listeners');
     notifyListeners();
-  }
-
-  Future<void> loadCategoriesFromExcel(int year) async {
-    if (_fileService == null || _config.dataDirectory == null) return;
-
-    try {
-      final excelCategories = await _fileService!.loadCategories(year);
-      final categories = excelCategories.map((excelRow) => 
-        TimeEntryCategory.fromExcelRow(excelRow)
-      ).toList();
-
-      _config = _config.copyWith(categories: categories);
-      notifyListeners();
-      debugPrint('ConfigService: Loaded ${categories.length} categories from Excel');
-    } catch (e) {
-      debugPrint('ConfigService: Failed to load categories from Excel: $e');
-    }
+    debugPrint('ConfigService: Listeners notified for theme change');
   }
 
   Future<void> saveCategoriesToExcel(int year) async {
@@ -355,74 +467,236 @@ class ConfigService extends ChangeNotifier {
   }
 
   Future<void> addCategory(TimeEntryCategory category) async {
-    final newCategories = List<TimeEntryCategory>.from(_config.categories);
-    newCategories.add(category);
-    _config = _config.copyWith(categories: newCategories);
+    debugPrint('ConfigService: Adding category "${category.name}" with ID ${category.id}');
+    debugPrint('ConfigService: Current default categories count: ${_defaultCategories.length}');
     
-    // Save to both config file and Excel
+    final newCategories = List<TimeEntryCategory>.from(_defaultCategories);
+    newCategories.add(category);
+    debugPrint('ConfigService: New default categories count: ${newCategories.length}');
+    
+    _defaultCategories = newCategories;
+    _config = _config.copyWith(categories: newCategories);
+    debugPrint('ConfigService: Updated config, default categories count: ${_defaultCategories.length}');
+    
+    // Save to config file only (these are default categories)
+    debugPrint('ConfigService: About to save config to file...');
     await _saveConfig();
-    if (_fileService != null && _config.dataDirectory != null) {
-      await saveCategoriesToExcel(DateTime.now().year);
-    }
+    debugPrint('ConfigService: Config saved successfully');
     
     notifyListeners();
+    debugPrint('ConfigService: Notified listeners');
   }
 
   Future<void> updateCategory(TimeEntryCategory category) async {
-    final newCategories = _config.categories.map((c) {
+    final newCategories = _defaultCategories.map((c) {
       return c.id == category.id ? category : c;
     }).toList();
+    
+    _defaultCategories = newCategories;
     _config = _config.copyWith(categories: newCategories);
     
-    // Save to both config file and Excel
+    // Save to config file only (these are default categories)
     await _saveConfig();
-    if (_fileService != null && _config.dataDirectory != null) {
-      await saveCategoriesToExcel(DateTime.now().year);
-    }
-    
     notifyListeners();
   }
 
   Future<void> removeCategory(String categoryId) async {
-    final category = _config.categories.firstWhere((c) => c.id == categoryId);
+    final category = _defaultCategories.firstWhere((c) => c.id == categoryId);
     if (category.isDefault) {
       throw Exception('Cannot remove default categories');
     }
     
-    final newCategories = _config.categories.where((c) => c.id != categoryId).toList();
+    final newCategories = _defaultCategories.where((c) => c.id != categoryId).toList();
+    
+    _defaultCategories = newCategories;
     _config = _config.copyWith(categories: newCategories);
     
-    // Save to both config file and Excel
+    // Save to config file only (these are default categories)
     await _saveConfig();
-    if (_fileService != null && _config.dataDirectory != null) {
-      await saveCategoriesToExcel(DateTime.now().year);
-    }
-    
     notifyListeners();
   }
 
   Future<void> addGoal(Goal goal) async {
-    final newGoals = List<Goal>.from(_config.goals);
+    debugPrint('ConfigService: Adding goal "${goal.title}" with ID ${goal.id}');
+    debugPrint('ConfigService: Current default goals count: ${_defaultGoals.length}');
+    
+    final newGoals = List<Goal>.from(_defaultGoals);
     newGoals.add(goal);
+    debugPrint('ConfigService: New default goals count: ${newGoals.length}');
+    
+    _defaultGoals = newGoals;
     _config = _config.copyWith(goals: newGoals);
+    debugPrint('ConfigService: Updated config, default goals count: ${_defaultGoals.length}');
+    
+    debugPrint('ConfigService: About to save config to file...');
     await _saveConfig();
+    debugPrint('ConfigService: Config saved successfully');
+    
     notifyListeners();
+    debugPrint('ConfigService: Notified listeners');
   }
 
   Future<void> updateGoal(Goal goal) async {
-    final newGoals = _config.goals.map((g) {
+    final newGoals = _defaultGoals.map((g) {
       return g.id == goal.id ? goal : g;
     }).toList();
+    
+    _defaultGoals = newGoals;
     _config = _config.copyWith(goals: newGoals);
     await _saveConfig();
     notifyListeners();
   }
 
   Future<void> removeGoal(String goalId) async {
-    final newGoals = _config.goals.where((g) => g.id != goalId).toList();
+    final newGoals = _defaultGoals.where((g) => g.id != goalId).toList();
+    
+    _defaultGoals = newGoals;
     _config = _config.copyWith(goals: newGoals);
     await _saveConfig();
     notifyListeners();
+  }
+
+  // Year-specific category and goal management
+  Future<void> addYearCategory(int year, TimeEntryCategory category) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      // Load current year categories
+      final yearCategories = await _fileService!.loadYearCategories(year);
+      yearCategories.add(category);
+      
+      // Save back to Excel
+      await _fileService!.saveYearCategories(year, yearCategories);
+      
+      // Update local config if this is the current year
+      if (year == DateTime.now().year) {
+        _config = _config.copyWith(categories: yearCategories);
+        notifyListeners();
+      }
+      
+      debugPrint('ConfigService: Added category "${category.name}" to year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to add category to year $year: $e');
+    }
+  }
+
+  Future<void> updateYearCategory(int year, TimeEntryCategory category) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      // Load current year categories
+      final yearCategories = await _fileService!.loadYearCategories(year);
+      final updatedCategories = yearCategories.map((c) {
+        return c.id == category.id ? category : c;
+      }).toList();
+      
+      // Save back to Excel
+      await _fileService!.saveYearCategories(year, updatedCategories);
+      
+      // Update local config if this is the current year
+      if (year == DateTime.now().year) {
+        _config = _config.copyWith(categories: updatedCategories);
+        notifyListeners();
+      }
+      
+      debugPrint('ConfigService: Updated category "${category.name}" in year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to update category in year $year: $e');
+    }
+  }
+
+  Future<void> removeYearCategory(int year, String categoryId) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      // Load current year categories
+      final yearCategories = await _fileService!.loadYearCategories(year);
+      final updatedCategories = yearCategories.where((c) => c.id != categoryId).toList();
+      
+      // Save back to Excel
+      await _fileService!.saveYearCategories(year, updatedCategories);
+      
+      // Update local config if this is the current year
+      if (year == DateTime.now().year) {
+        _config = _config.copyWith(categories: updatedCategories);
+        notifyListeners();
+      }
+      
+      debugPrint('ConfigService: Removed category from year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to remove category from year $year: $e');
+    }
+  }
+
+  Future<void> addYearGoal(int year, Goal goal) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      // Load current year goals
+      final yearGoals = await _fileService!.loadYearGoals(year);
+      yearGoals.add(goal);
+      
+      // Save back to Excel
+      await _fileService!.saveYearGoals(year, yearGoals);
+      
+      // Update local config if this is the current year
+      if (year == DateTime.now().year) {
+        _config = _config.copyWith(goals: yearGoals);
+        notifyListeners();
+      }
+      
+      debugPrint('ConfigService: Added goal "${goal.title}" to year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to add goal to year $year: $e');
+    }
+  }
+
+  Future<void> updateYearGoal(int year, Goal goal) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      // Load current year goals
+      final yearGoals = await _fileService!.loadYearGoals(year);
+      final updatedGoals = yearGoals.map((g) {
+        return g.id == goal.id ? goal : g;
+      }).toList();
+      
+      // Save back to Excel
+      await _fileService!.saveYearGoals(year, updatedGoals);
+      
+      // Update local config if this is the current year
+      if (year == DateTime.now().year) {
+        _config = _config.copyWith(goals: updatedGoals);
+        notifyListeners();
+      }
+      
+      debugPrint('ConfigService: Updated goal "${goal.title}" in year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to update goal in year $year: $e');
+    }
+  }
+
+  Future<void> removeYearGoal(int year, String goalId) async {
+    if (_fileService == null || _config.dataDirectory == null) return;
+
+    try {
+      // Load current year goals
+      final yearGoals = await _fileService!.loadYearGoals(year);
+      final updatedGoals = yearGoals.where((g) => g.id != goalId).toList();
+      
+      // Save back to Excel
+      await _fileService!.saveYearGoals(year, updatedGoals);
+      
+      // Update local config if this is the current year
+      if (year == DateTime.now().year) {
+        _config = _config.copyWith(goals: updatedGoals);
+        notifyListeners();
+      }
+      
+      debugPrint('ConfigService: Removed goal from year $year');
+    } catch (e) {
+      debugPrint('ConfigService: Failed to remove goal from year $year: $e');
+    }
   }
 
   TimeEntryCategory? getCategoryById(String id) {

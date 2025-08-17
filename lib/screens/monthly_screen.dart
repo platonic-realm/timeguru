@@ -257,113 +257,115 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
             ],
           ),
         ),
-      child: Padding(
+        child: Padding(
           padding: ResponsiveUtils.getResponsivePadding(horizontal: 20, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  Container(
-                    padding: EdgeInsets.all(ResponsiveUtils.getResponsiveSpacing(8)),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(ResponsiveUtils.getResponsiveBorderRadius(12)),
-                    ),
-                    child: Icon(
-                  Icons.analytics,
-                  color: Theme.of(context).colorScheme.primary,
-                      size: ResponsiveUtils.getResponsiveIconSize(24),
-                    ),
-                  ),
-                  SizedBox(width: ResponsiveUtils.getResponsiveSpacing(12)),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                Text(
-                  'Monthly Overview',
-                          style: ResponsiveUtils.getResponsiveTextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          '${_getMonthName(DateTime.now().month)} ${DateTime.now().year}',
-                          style: ResponsiveUtils.getResponsiveTextStyle(
-                            fontSize: 14,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: ResponsiveUtils.getResponsiveSpacing(20)),
-              
-              // Progress bar for task completion
-              if (overview.totalTasks > 0) ...[
                 Row(
                   children: [
+                    Container(
+                      padding: EdgeInsets.all(ResponsiveUtils.getResponsiveSpacing(8)),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(ResponsiveUtils.getResponsiveBorderRadius(12)),
+                      ),
+                      child: Icon(
+                        Icons.analytics,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: ResponsiveUtils.getResponsiveIconSize(24),
+                      ),
+                    ),
+                    SizedBox(width: ResponsiveUtils.getResponsiveSpacing(12)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Task Progress',
+                            'Monthly Overview',
                             style: ResponsiveUtils.getResponsiveTextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(4)),
-                          LinearProgressIndicator(
-                            value: overview.totalTasks > 0 
-                                ? overview.completedTasks / overview.totalTasks 
-                                : 0.0,
-                            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).colorScheme.primary,
+                          Text(
+                            '${_getMonthName(DateTime.now().month)} ${DateTime.now().year}',
+                            style: ResponsiveUtils.getResponsiveTextStyle(
+                              fontSize: 14,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
-                            minHeight: ResponsiveUtils.getResponsiveSpacing(8),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(width: ResponsiveUtils.getResponsiveSpacing(16)),
-                    Text(
-                      '${((overview.completedTasks / overview.totalTasks) * 100).toStringAsFixed(0)}%',
-                      style: ResponsiveUtils.getResponsiveTextStyle(
-                        fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
+                  ],
+                ),
+                SizedBox(height: ResponsiveUtils.getResponsiveSpacing(20)),
+                
+                // Progress bar for task completion
+                if (overview.totalTasks > 0) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Task Progress',
+                              style: ResponsiveUtils.getResponsiveTextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            SizedBox(height: ResponsiveUtils.getResponsiveSpacing(4)),
+                            LinearProgressIndicator(
+                              value: overview.totalTasks > 0 
+                                  ? overview.completedTasks / overview.totalTasks 
+                                  : 0.0,
+                              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.primary,
+                              ),
+                              minHeight: ResponsiveUtils.getResponsiveSpacing(8),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: ResponsiveUtils.getResponsiveSpacing(16)),
+                      Text(
+                        '${((overview.completedTasks / overview.totalTasks) * 100).toStringAsFixed(0)}%',
+                        style: ResponsiveUtils.getResponsiveTextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
+                  SizedBox(height: ResponsiveUtils.getResponsiveSpacing(20)),
+                ],
+                
+                // Enhanced stat grid
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: ResponsiveUtils.getResponsiveGridColumns(),
+                  crossAxisSpacing: ResponsiveUtils.getResponsiveSpacing(4),
+                  mainAxisSpacing: ResponsiveUtils.getResponsiveSpacing(4),
+                  childAspectRatio: 2.5, // Make items rectangular (wider than tall)
+                  children: [
+                      _buildEnhancedStatCard('Days', overview.totalDays.toString(), Icons.calendar_today, 'Active'),
+                      _buildEnhancedStatCard('Tasks', '${overview.completedTasks}/${overview.totalTasks}', Icons.check_circle, 'Completed'),
+                      _buildEnhancedStatCard('Study', _formatDuration(overview.studyHours), Icons.school, 'Hours'),
+                      _buildEnhancedStatCard('Work', _formatDuration(overview.workHours), Icons.work, 'Hours'),
+                      _buildEnhancedStatCard('Family', _formatDuration(overview.familyHours), Icons.family_restroom, 'Hours'),
+                      _buildEnhancedStatCard('Quot.', _formatDuration(overview.quotidianHours), Icons.home, 'Hours'),
+                  ],
                 ),
               ],
             ),
-                SizedBox(height: ResponsiveUtils.getResponsiveSpacing(20)),
-              ],
-            
-              // Enhanced stat grid
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: ResponsiveUtils.getResponsiveGridColumns(),
-                crossAxisSpacing: ResponsiveUtils.getResponsiveSpacing(4),
-                mainAxisSpacing: ResponsiveUtils.getResponsiveSpacing(4),
-                childAspectRatio: ResponsiveUtils.getResponsiveGridAspectRatio(),
-              children: [
-                  _buildEnhancedStatCard('Days', overview.totalDays.toString(), Icons.calendar_today, 'Active'),
-                  _buildEnhancedStatCard('Tasks', '${overview.completedTasks}/${overview.totalTasks}', Icons.check_circle, 'Completed'),
-                  _buildEnhancedStatCard('Study', _formatDuration(overview.studyHours), Icons.school, 'Hours'),
-                  _buildEnhancedStatCard('Work', _formatDuration(overview.workHours), Icons.work, 'Hours'),
-                  _buildEnhancedStatCard('Family', _formatDuration(overview.familyHours), Icons.family_restroom, 'Hours'),
-                  _buildEnhancedStatCard('Quot.', _formatDuration(overview.quotidianHours), Icons.home, 'Hours'),
-              ],
-            ),
-          ],
           ),
         ),
       ),
@@ -371,6 +373,9 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
   }
 
   Widget _buildEnhancedStatCard(String label, String value, IconData icon, String subtitle) {
+    // Initialize ResponsiveUtils
+    ResponsiveUtils.init(context);
+    
     return Container(
       padding: EdgeInsets.all(ResponsiveUtils.getResponsiveSpacing(10)),
       decoration: BoxDecoration(
@@ -388,53 +393,133 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
           ),
         ],
       ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Always use horizontal layout for overview items to save vertical space
+          return _buildHorizontalStatLayout(label, value, icon, subtitle);
+        },
+      ),
+    );
+  }
+
+  Widget _buildVerticalStatLayout(String label, String value, IconData icon, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.all(4.0), // Further reduced padding
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min, // Make it more compact
         children: [
           Container(
-            padding: EdgeInsets.all(ResponsiveUtils.getResponsiveSpacing(8)),
+            padding: EdgeInsets.all(ResponsiveUtils.getResponsiveSpacing(4)), // Further reduced padding
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(ResponsiveUtils.getResponsiveBorderRadius(12)),
+              borderRadius: BorderRadius.circular(ResponsiveUtils.getResponsiveBorderRadius(6)), // Reduced radius
             ),
             child: Icon(
               icon, 
-              size: ResponsiveUtils.getResponsiveIconSize(18), 
+              size: ResponsiveUtils.getResponsiveIconSize(14), // Further reduced icon size
               color: Theme.of(context).colorScheme.primary
             ),
           ),
-          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(8)),
-          Text(
-            value,
-            style: ResponsiveUtils.getResponsiveTextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(2)), // Minimal spacing
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: ResponsiveUtils.getResponsiveFontSize(11), // Further reduced font size
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis, // Handle text overflow
             ),
-            textAlign: TextAlign.center,
           ),
-          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(2)),
-          Text(
-            label,
-            style: ResponsiveUtils.getResponsiveTextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(1)), // Minimal spacing
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: ResponsiveUtils.getResponsiveFontSize(9), // Further reduced font size
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis, // Handle text overflow
             ),
-            textAlign: TextAlign.center,
           ),
           if (subtitle.isNotEmpty) ...[
-            SizedBox(height: ResponsiveUtils.getResponsiveSpacing(2)),
-            Text(
-              subtitle,
-              style: ResponsiveUtils.getResponsiveTextStyle(
-                fontSize: 10,
-                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            SizedBox(height: ResponsiveUtils.getResponsiveSpacing(1)), // Minimal spacing
+            Flexible(
+              child: Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.getResponsiveFontSize(7), // Further reduced font size
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis, // Handle text overflow
               ),
-            textAlign: TextAlign.center,
-          ),
+            ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildHorizontalStatLayout(String label, String value, IconData icon, String subtitle) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: EdgeInsets.all(ResponsiveUtils.getResponsiveSpacing(6)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(ResponsiveUtils.getResponsiveBorderRadius(8)),
+          ),
+          child: Icon(
+            icon, 
+            size: ResponsiveUtils.getResponsiveIconSize(16), 
+            color: Theme.of(context).colorScheme.primary
+          ),
+        ),
+        SizedBox(width: ResponsiveUtils.getResponsiveSpacing(8)),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.getResponsiveFontSize(13),
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.left,
+              ),
+              SizedBox(height: ResponsiveUtils.getResponsiveSpacing(1)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: ResponsiveUtils.getResponsiveFontSize(11),
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.left,
+              ),
+              if (subtitle.isNotEmpty) ...[
+                SizedBox(height: ResponsiveUtils.getResponsiveSpacing(1)),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: ResponsiveUtils.getResponsiveFontSize(9),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                  textAlign: TextAlign.left,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -442,23 +527,73 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
   Widget _buildTopSummaries(AppProvider provider, MonthlyOverview overview) {
     return Column(
       children: [
-        SizedBox(
-          height: ResponsiveUtils.getResponsiveSummaryHeight(),
-          child: PageView(
-            controller: _summaryController,
-            onPageChanged: (index) {
-              if (_summaryPage != index) {
-                setState(() => _summaryPage = index);
-              }
-            },
-            physics: const BouncingScrollPhysics(),
-            allowImplicitScrolling: false,
-            children: [
-              _buildOverviewCard(overview),
-              _buildTimeSummaryCard(provider),
-              _buildGraphsPlaceholderCard(),
-            ],
-          ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate dynamic height based on content and available space
+            final availableWidth = constraints.maxWidth;
+            
+            // Calculate height based on content type and screen size
+            double dynamicHeight;
+            
+            // Always use the overview page height as the fixed container height
+            // This ensures consistent layout across all page swaps
+            final crossAxisCount = ResponsiveUtils.getResponsiveGridColumns();
+            final totalItems = 6; // Days, Tasks, Study, Work, Family, Quot.
+            final rowsNeeded = (totalItems / crossAxisCount).ceil();
+            
+            // Calculate item dimensions
+            final itemWidth = (availableWidth - (crossAxisCount - 1) * ResponsiveUtils.getResponsiveSpacing(4)) / crossAxisCount;
+            
+            // Calculate total height step by step for overview page:
+            double totalHeight = 0;
+            
+            // 1. Card padding (top and bottom)
+            totalHeight += ResponsiveUtils.getResponsiveSpacing(20) * 2; // 20 top + 20 bottom
+            
+            // 2. Header section
+            totalHeight += ResponsiveUtils.getResponsiveSpacing(8) * 2; // Icon container padding
+            totalHeight += ResponsiveUtils.getResponsiveIconSize(24); // Icon size
+            totalHeight += ResponsiveUtils.getResponsiveSpacing(20); // Spacing after header
+            
+            // 3. Progress bar section (only if tasks exist)
+            if (overview.totalTasks > 0) {
+              totalHeight += ResponsiveUtils.getResponsiveSpacing(14); // Task Progress text
+              totalHeight += ResponsiveUtils.getResponsiveSpacing(4); // Spacing before progress bar
+              totalHeight += ResponsiveUtils.getResponsiveSpacing(8); // Progress bar height
+              totalHeight += ResponsiveUtils.getResponsiveSpacing(20); // Spacing after progress bar
+            }
+            
+            // 4. Grid section - calculate actual grid height
+            final childAspectRatio = 2.5; // Rectangular items (wider than tall)
+            final gridItemHeight = itemWidth / childAspectRatio;
+            totalHeight += rowsNeeded * gridItemHeight; // Grid rows height
+            totalHeight += (rowsNeeded - 1) * ResponsiveUtils.getResponsiveSpacing(4); // Row spacing between rows
+            
+            // 5. Safety margin
+            totalHeight += ResponsiveUtils.getResponsiveSpacing(10);
+            
+            // Use this fixed height for all pages
+            dynamicHeight = totalHeight;
+            
+            return SizedBox(
+              height: dynamicHeight,
+              child: PageView(
+                controller: _summaryController,
+                onPageChanged: (index) {
+                  if (_summaryPage != index) {
+                    setState(() => _summaryPage = index);
+                  }
+                },
+                physics: const BouncingScrollPhysics(),
+                allowImplicitScrolling: false,
+                children: [
+                  _buildOverviewCard(overview),
+                  _buildTimeSummaryCard(provider),
+                  _buildGraphsPlaceholderCard(),
+                ],
+              ),
+            );
+          },
         ),
         SizedBox(height: ResponsiveUtils.getResponsiveSpacing(8)),
         // Debug navigation buttons
@@ -679,85 +814,87 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
         ),
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.timelapse,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Time Summary',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          '${_getMonthName(provider.currentMonth)} ${provider.currentYear}',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              // Total time display
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      Icons.schedule,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Total Time: ${totalHours.toStringAsFixed(1)} hours',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.timelapse,
                         color: Theme.of(context).colorScheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Time Summary',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '${_getMonthName(provider.currentMonth)} ${provider.currentYear}',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 20),
-              
-              // Category bars
-              bar('work', totals['work']!),
-              bar('study', totals['study']!),
-              bar('family', totals['family']!),
-              bar('quotidian', totals['quotidian']!),
-              bar('idle', totals['idle']!),
-            ],
+                const SizedBox(height: 20),
+                
+                // Total time display
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Total Time: ${totalHours.toStringAsFixed(1)} hours',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Category bars
+                bar('work', totals['work']!),
+                bar('study', totals['study']!),
+                bar('family', totals['family']!),
+                bar('quotidian', totals['quotidian']!),
+                bar('idle', totals['idle']!),
+              ],
+            ),
           ),
         ),
       ),
@@ -788,87 +925,93 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
         ),
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.insights,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Analytics & Insights',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          'Data visualization and trends',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              // Placeholder content with better styling
-              Container(
-                height: ResponsiveUtils.getResponsiveSummaryHeight() * 0.3, // Adjust height based on summary height
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
-                    width: 2,
-                    style: BorderStyle.solid,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      Icons.bar_chart,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Advanced Analytics',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.insights,
+                        color: Theme.of(context).colorScheme.primary,
+                        size: 24,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Coming soon: Interactive charts,\ntrends, and insights',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Analytics & Insights',
+                            style: ResponsiveUtils.getResponsiveTextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            'Data visualization and trends',
+                            style: ResponsiveUtils.getResponsiveTextStyle(
+                              fontSize: 14,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                
+                // Placeholder content with better styling
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      width: 2,
+                      style: BorderStyle.solid,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.bar_chart,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Advanced Analytics',
+                        style: ResponsiveUtils.getResponsiveTextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Coming soon: Interactive charts,\ntrends, and insights',
+                        textAlign: TextAlign.center,
+                        style: ResponsiveUtils.getResponsiveTextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

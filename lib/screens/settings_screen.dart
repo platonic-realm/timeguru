@@ -176,7 +176,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Time Entry Categories',
+                  'Default Categories',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -189,8 +189,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Text(
+              'These categories will be used as templates when creating new year files.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 16),
-            ...configService.categories.map((category) => _buildCategoryTile(category, configService)),
+            if (configService.defaultCategories.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'No default categories set yet. Add your first default category to get started!',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            else
+              ...configService.defaultCategories.map((category) => _buildCategoryTile(category, configService)),
           ],
         ),
       ),
@@ -248,7 +269,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Goals',
+                  'Default Goals',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -261,13 +282,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            Text(
+              'These goals will be used as templates when creating new year files.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 16),
-            if (configService.goals.isEmpty)
+            if (configService.defaultGoals.isEmpty)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
-                    'No goals set yet. Add your first goal to get started!',
+                    'No default goals set yet. Add your first default goal to get started!',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -276,7 +304,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               )
             else
-              ...configService.goals.map((goal) => _buildGoalTile(goal, configService)),
+              ...configService.defaultGoals.map((goal) => _buildGoalTile(goal, configService)),
           ],
         ),
       ),

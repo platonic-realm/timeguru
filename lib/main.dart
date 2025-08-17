@@ -23,7 +23,6 @@ class TimeGuru extends StatefulWidget {
 
 class _TimeGuruState extends State<TimeGuru> {
   late final ConfigService _configService;
-  ThemeMode _themeMode = ThemeMode.system;
   bool _isConfigReady = false;
 
   @override
@@ -38,7 +37,6 @@ class _TimeGuruState extends State<TimeGuru> {
       await _configService.initialize();
       if (mounted) {
         setState(() {
-          _themeMode = _configService.themeMode;
           _isConfigReady = true;
         });
       }
@@ -65,23 +63,30 @@ class _TimeGuruState extends State<TimeGuru> {
       );
     }
 
-    return ChangeNotifierProvider.value(
-      value: _configService,
-      child: MaterialApp(
-        title: 'TimeGuru',
-        themeMode: _themeMode,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-          useMaterial3: true,
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-        ),
-        home: TimeGuruApp(configService: _configService),
+    return ChangeNotifierProvider<ConfigService>(
+      create: (_) => _configService,
+      child: Consumer<ConfigService>(
+        builder: (context, configService, child) {
+          debugPrint('TimeGuru: Consumer rebuilding with theme mode: ${configService.themeMode.name}');
+          debugPrint('TimeGuru: Current theme mode: ${configService.themeMode.name}');
+          return MaterialApp(
+            key: ValueKey(configService.themeMode.name), // Force rebuild when theme changes
+            title: 'TimeGuru',
+            themeMode: configService.themeMode,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+              useMaterial3: true,
+            ),
+            darkTheme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.blue,
+                brightness: Brightness.dark,
+              ),
+              useMaterial3: true,
+            ),
+            home: TimeGuruApp(configService: _configService),
+          );
+        },
       ),
     );
   }
@@ -155,11 +160,12 @@ class _TimeGuruAppState extends State<TimeGuruApp> {
       await Future.delayed(const Duration(milliseconds: 500));
       
       if (mounted && widget.configService.isInitialized) {
-        await widget.configService.loadCategoriesFromExcel(DateTime.now().year);
-        debugPrint('TimeGuruApp: Categories loaded successfully in background');
+        // Load year-specific data for current year
+        await widget.configService.loadYearData(DateTime.now().year);
+        debugPrint('TimeGuruApp: Year data loaded successfully in background');
       }
     } catch (e) {
-      debugPrint('TimeGuruApp: Failed to load categories in background: $e');
+      debugPrint('TimeGuruApp: Failed to load year data in background: $e');
     }
   }
 

@@ -4,6 +4,7 @@ import '../models/time_entry.dart';
 import '../services/file_service.dart';
 import '../services/config_service.dart';
 import '../services/calendar_service.dart';
+import 'dart:io'; // Added for Directory and File
 
 class AppProvider extends ChangeNotifier {
   final FileService _fileService;
@@ -36,6 +37,14 @@ class AppProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
+  // Get default categories and goals (from JSON config)
+  List<TimeEntryCategory> get defaultCategories => _configService.defaultCategories;
+  List<Goal> get defaultGoals => _configService.defaultGoals;
+
+  // Get year-specific categories and goals (from Excel files)
+  List<TimeEntryCategory> get yearCategories => _configService.yearCategories;
+  List<Goal> get yearGoals => _configService.yearGoals;
+
   // Available years and months
   List<int> get availableYears => _fileService.getAvailableYears();
   List<int> get availableMonths => _fileService.getAvailableMonths(_currentYear);
@@ -45,6 +54,12 @@ class AppProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       await _fileService.initialize();
+      
+      // Ensure year file exists for current year
+      await _ensureYearFileExists(_currentYear);
+      
+      // Load year-specific data for current year
+      await _configService.loadYearData(_currentYear);
       
       // Load current month
       await loadMonth(_currentYear, _currentMonth);
@@ -58,6 +73,22 @@ class AppProvider extends ChangeNotifier {
       debugPrint('NewAppProvider: Initialization error: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // Ensure year file exists for the specified year
+  Future<void> _ensureYearFileExists(int year) async {
+    try {
+      // Check if year file exists, if not create it with default data
+      final yearDir = Directory('${_fileService.dataDirectoryPath}/$year');
+      final excelFile = File('${yearDir.path}/$year.xlsx');
+      
+      if (!await excelFile.exists()) {
+        debugPrint('AppProvider: Creating year file for $year');
+        await _configService.createYearFile(year);
+      }
+    } catch (e) {
+      debugPrint('AppProvider: Failed to ensure year file exists for $year: $e');
     }
   }
 
@@ -93,6 +124,13 @@ class AppProvider extends ChangeNotifier {
     if (_selectedDate.year != newDate.year || _selectedDate.month != newDate.month) {
       // Load the new month if it's different
       await loadMonth(newDate.year, newDate.month);
+      
+      // Load year-specific data (categories and goals)
+      if (_selectedDate.year != newDate.year) {
+        // Ensure year file exists for the new year
+        await _ensureYearFileExists(newDate.year);
+        await _configService.loadYearData(newDate.year);
+      }
     }
     
     _selectedDate = newDate;
@@ -304,7 +342,7 @@ class AppProvider extends ChangeNotifier {
       await _fileService.saveTimeEntries(_currentYear, _timeEntries);
       
       // Update calendar if enabled
-      if (_configService.config.autoSyncCalendar) {
+      if (_configService.autoSyncCalendar) {
         await _calendarService.addTimeEntryToCalendar(entry);
       }
       
@@ -332,7 +370,7 @@ class AppProvider extends ChangeNotifier {
         await _fileService.saveTimeEntries(_currentYear, _timeEntries);
         
         // Update calendar if enabled
-        if (_configService.config.autoSyncCalendar) {
+        if (_configService.autoSyncCalendar) {
           await _calendarService.updateTimeEntryInCalendar(entry);
         }
         
@@ -359,7 +397,7 @@ class AppProvider extends ChangeNotifier {
       await _fileService.saveTimeEntries(_currentYear, _timeEntries);
       
       // Remove from calendar if enabled
-      if (_configService.config.autoSyncCalendar) {
+      if (_configService.autoSyncCalendar) {
         await _calendarService.removeTimeEntryFromCalendar(id);
       }
       

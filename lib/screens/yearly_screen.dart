@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../models/time_entry.dart';
 import '../utils/responsive_utils.dart';
+import '../services/config_service.dart';
+import '../widgets/edit_category_dialog.dart';
+import '../widgets/edit_goal_dialog.dart';
 
 class YearlyScreen extends StatefulWidget {
   final int? initialYear;
@@ -121,6 +124,15 @@ class _YearlyScreenState extends State<YearlyScreen> {
           );
         },
       ),
+      floatingActionButton: Consumer<AppProvider>(
+        builder: (context, provider, child) {
+          return FloatingActionButton.extended(
+            onPressed: () => _showAddCategoryDialog(context, Provider.of<ConfigService>(context, listen: false), provider.selectedDate.year),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Category'),
+          );
+        },
+      ),
     );
   }
 
@@ -136,6 +148,16 @@ class _YearlyScreenState extends State<YearlyScreen> {
         children: [
           // Yearly overview card
           _buildYearlyOverviewCard(yearTimeEntries, provider),
+          
+          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(16)),
+          
+          // Categories Section
+          _buildCategoriesSection(provider),
+          
+          SizedBox(height: ResponsiveUtils.getResponsiveSpacing(16)),
+          
+          // Goals Section
+          _buildGoalsSection(provider),
           
           SizedBox(height: ResponsiveUtils.getResponsiveSpacing(16)),
           
@@ -230,6 +252,295 @@ class _YearlyScreenState extends State<YearlyScreen> {
     );
   }
 
+  Widget _buildCategoriesSection(AppProvider provider) {
+    return Consumer<ConfigService>(
+      builder: (context, configService, child) {
+        return FutureBuilder<List<TimeEntryCategory>>(
+          future: _loadYearCategories(configService, provider.selectedDate.year),
+          builder: (context, snapshot) {
+            final yearCategories = snapshot.data ?? [];
+            
+            return Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.category,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Categories for ${provider.selectedDate.year}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddCategoryDialog(context, configService, provider.selectedDate.year),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (yearCategories.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'No categories for this year yet. Add your first category to get started!',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: yearCategories.length,
+                        itemBuilder: (context, index) {
+                          final category = yearCategories[index];
+                          return ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _parseColor(category.color).withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                _getCategoryIcon(category.icon),
+                                color: _parseColor(category.color),
+                              ),
+                            ),
+                            title: Text(category.name),
+                            subtitle: Text(category.isDefault ? 'Default Category' : 'Custom Category'),
+                            trailing: category.isDefault
+                                ? const Chip(label: Text('Default'))
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        onPressed: () => _editCategory(category, configService, provider.selectedDate.year),
+                                        icon: const Icon(Icons.edit),
+                                        tooltip: 'Edit',
+                                      ),
+                                      IconButton(
+                                        onPressed: () => _deleteCategory(category, configService, provider.selectedDate.year),
+                                        icon: const Icon(Icons.delete),
+                                        tooltip: 'Delete',
+                                        color: Colors.red,
+                                      ),
+                                    ],
+                                  ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildGoalsSection(AppProvider provider) {
+    return Consumer<ConfigService>(
+      builder: (context, configService, child) {
+        return FutureBuilder<List<Goal>>(
+          future: _loadYearGoals(configService, provider.selectedDate.year),
+          builder: (context, snapshot) {
+            final yearGoals = snapshot.data ?? [];
+            
+            return Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.flag,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Goals for ${provider.selectedDate.year}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddGoalDialog(context, configService, provider.selectedDate.year),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (yearGoals.isEmpty)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'No goals for this year yet. Add your first goal to get started!',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: yearGoals.length,
+                        itemBuilder: (context, index) {
+                          final goal = yearGoals[index];
+                          final daysUntilDeadline = goal.deadline.difference(DateTime.now()).inDays;
+                          final isOverdue = daysUntilDeadline < 0;
+                          final isDueSoon = daysUntilDeadline <= 7 && daysUntilDeadline >= 0;
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _parseColor(goal.color).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  _getCategoryIcon(goal.icon),
+                                  color: _parseColor(goal.color),
+                                ),
+                              ),
+                              title: Text(
+                                goal.title,
+                                style: TextStyle(
+                                  decoration: goal.isCompleted ? TextDecoration.lineThrough : null,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(goal.description),
+                                  const SizedBox(height: 4),
+                                  Wrap(
+                                    spacing: 4,
+                                    children: goal.tags.map((tag) => Chip(
+                                      label: Text(tag),
+                                      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                      labelStyle: Theme.of(context).textTheme.bodySmall,
+                                    )).toList(),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today,
+                                        size: 16,
+                                        color: isOverdue
+                                            ? Colors.red
+                                            : isDueSoon
+                                                ? Colors.orange
+                                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        isOverdue
+                                            ? 'Overdue by ${daysUntilDeadline.abs()} days'
+                                            : isDueSoon
+                                                ? 'Due in $daysUntilDeadline days'
+                                                : 'Due ${goal.deadline.day}/${goal.deadline.month}/${goal.deadline.year}',
+                                        style: TextStyle(
+                                          color: isOverdue
+                                              ? Colors.red
+                                              : isDueSoon
+                                                  ? Colors.orange
+                                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                                          fontWeight: isOverdue || isDueSoon ? FontWeight.w600 : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Checkbox(
+                                    value: goal.isCompleted,
+                                    onChanged: (bool? value) {
+                                      if (value != null) {
+                                        final updatedGoal = goal.copyWith(isCompleted: value);
+                                        configService.updateYearGoal(provider.selectedDate.year, updatedGoal);
+                                      }
+                                    },
+                                  ),
+                                  PopupMenuButton(
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit),
+                                            SizedBox(width: 8),
+                                            Text('Edit'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('Delete', style: TextStyle(color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    onSelected: (value) {
+                                      if (value == 'edit') {
+                                        _editGoal(goal, configService, provider.selectedDate.year);
+                                      } else if (value == 'delete') {
+                                        _deleteGoal(goal, configService, provider.selectedDate.year);
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildMonthlyBreakdownCard(AppProvider provider) {
     final availableMonths = provider.availableMonths;
     
@@ -274,11 +585,11 @@ class _YearlyScreenState extends State<YearlyScreen> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 1.5,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: ResponsiveUtils.isSmallScreen ? 2 : 3,
+                  crossAxisSpacing: ResponsiveUtils.getResponsiveSpacing(8),
+                  mainAxisSpacing: ResponsiveUtils.getResponsiveSpacing(8),
+                  childAspectRatio: ResponsiveUtils.isSmallScreen ? 1.0 : 1.3,
                 ),
                 itemCount: availableMonths.length,
                 itemBuilder: (context, index) {
@@ -303,6 +614,13 @@ class _YearlyScreenState extends State<YearlyScreen> {
       (total, entry) => total + entry.duration,
     );
 
+    // Initialize ResponsiveUtils
+    ResponsiveUtils.init(context);
+    
+    // Determine layout based on screen width
+    final isSmallScreen = ResponsiveUtils.isSmallScreen;
+    final isMobile = ResponsiveUtils.isMobile;
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -311,25 +629,116 @@ class _YearlyScreenState extends State<YearlyScreen> {
           color: Theme.of(context).colorScheme.outlineVariant,
         ),
       ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Determine layout based on available height and screen width
+          final availableHeight = constraints.maxHeight;
+          final isSmallScreen = ResponsiveUtils.isSmallScreen;
+          final isMobile = ResponsiveUtils.isMobile;
+          final shouldUseHorizontal = (isSmallScreen || isMobile || ResponsiveUtils.screenWidth < 800 || availableHeight < 70);
+          
+          return (isSmallScreen || isMobile || ResponsiveUtils.screenWidth < 800)
+              ? _buildVerticalLayout(monthName, totalHours, monthTimeEntries.length)
+              : _buildHorizontalLayout(monthName, totalHours, monthTimeEntries.length);
+        },
+      ),
+    );
+  }
+
+  Widget _buildVerticalLayout(String monthName, Duration totalHours, int entryCount) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             monthName,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            style: TextStyle(
+              fontSize: ResponsiveUtils.getResponsiveFontSize(14),
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             _formatDuration(totalHours),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: TextStyle(
+              fontSize: ResponsiveUtils.getResponsiveFontSize(16),
               fontWeight: FontWeight.bold,
             ),
           ),
           Text(
-            '${monthTimeEntries.length} entries',
-            style: Theme.of(context).textTheme.bodySmall,
+            '$entryCount entries',
+            style: TextStyle(
+              fontSize: ResponsiveUtils.getResponsiveFontSize(12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHorizontalLayout(String monthName, Duration totalHours, int entryCount) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  monthName,
+                  style: TextStyle(
+                    fontSize: ResponsiveUtils.getResponsiveFontSize(12),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _formatDuration(totalHours),
+                  style: TextStyle(
+                    fontSize: ResponsiveUtils.getResponsiveFontSize(14),
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 30,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.article,
+                  size: ResponsiveUtils.getResponsiveIconSize(16),
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$entryCount',
+                  style: TextStyle(
+                    fontSize: ResponsiveUtils.getResponsiveFontSize(12),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                Text(
+                  'entries',
+                  style: TextStyle(
+                    fontSize: ResponsiveUtils.getResponsiveFontSize(10),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -545,6 +954,196 @@ class _YearlyScreenState extends State<YearlyScreen> {
         return Colors.blue;
       default:
         return Colors.grey;
+    }
+  }
+
+  void _showAddCategoryDialog(BuildContext context, ConfigService configService, int year) {
+    final scaffoldContext = context;
+    showDialog<TimeEntryCategory>(
+      context: context,
+      builder: (context) => const EditCategoryDialog(),
+    ).then((category) async {
+      if (category != null) {
+        await configService.addYearCategory(year, category);
+        if (mounted && scaffoldContext.mounted) {
+          ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+            SnackBar(content: Text('Category "${category.name}" added to year $year')),
+          );
+        }
+      }
+    });
+  }
+
+  void _showAddGoalDialog(BuildContext context, ConfigService configService, int year) {
+    final scaffoldContext = context;
+    showDialog<Goal>(
+      context: context,
+      builder: (context) => const EditGoalDialog(),
+    ).then((goal) async {
+      if (goal != null) {
+        await configService.addYearGoal(year, goal);
+        if (mounted && scaffoldContext.mounted) {
+          ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+            SnackBar(content: Text('Goal "${goal.title}" added to year $year')),
+          );
+        }
+      }
+    });
+  }
+
+  void _editCategory(TimeEntryCategory category, ConfigService configService, int year) {
+    final scaffoldContext = context;
+    showDialog<TimeEntryCategory>(
+      context: context,
+      builder: (context) => EditCategoryDialog(
+        category: category,
+        isEditing: true,
+      ),
+    ).then((updatedCategory) async {
+      if (updatedCategory != null) {
+        await configService.updateYearCategory(year, updatedCategory);
+        if (mounted && scaffoldContext.mounted) {
+          ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+            SnackBar(content: Text('Category "${updatedCategory.name}" updated in year $year')),
+          );
+        }
+      }
+    });
+  }
+
+  void _editGoal(Goal goal, ConfigService configService, int year) {
+    final scaffoldContext = context;
+    showDialog<Goal>(
+      context: context,
+      builder: (context) => EditGoalDialog(
+        goal: goal,
+        isEditing: true,
+      ),
+    ).then((updatedGoal) async {
+      if (updatedGoal != null) {
+        await configService.updateYearGoal(year, updatedGoal);
+        if (mounted && scaffoldContext.mounted) {
+          ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+            SnackBar(content: Text('Goal "${updatedGoal.title}" updated in year $year')),
+          );
+        }
+      }
+    });
+  }
+
+  void _deleteCategory(TimeEntryCategory category, ConfigService configService, int year) {
+    final scaffoldContext = context;
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Category'),
+        content: Text('Are you sure you want to delete "${category.name}" from year $year? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    ).then((confirmed) async {
+      if (confirmed == true) {
+        try {
+          await configService.removeYearCategory(year, category.id);
+          if (mounted && scaffoldContext.mounted) {
+            ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+              SnackBar(content: Text('Category "${category.name}" deleted from year $year')),
+            );
+          }
+        } catch (e) {
+          if (mounted && scaffoldContext.mounted) {
+            ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+              SnackBar(content: Text('Error deleting category: $e')),
+            );
+          }
+        }
+      }
+    });
+  }
+
+  void _deleteGoal(Goal goal, ConfigService configService, int year) {
+    final scaffoldContext = context;
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Goal'),
+        content: Text('Are you sure you want to delete "${goal.title}" from year $year? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    ).then((confirmed) async {
+      if (confirmed == true) {
+        try {
+          await configService.removeYearGoal(year, goal.id);
+          if (mounted && scaffoldContext.mounted) {
+            ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+              SnackBar(content: Text('Goal "${goal.title}" deleted from year $year')),
+            );
+          }
+        } catch (e) {
+          if (mounted && scaffoldContext.mounted) {
+            ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+              SnackBar(content: Text('Error deleting goal: $e')),
+            );
+          }
+        }
+      }
+    });
+  }
+
+  // Helper methods
+  Color _parseColor(String colorString) {
+    try {
+      if (colorString.startsWith('#')) {
+        final hexString = colorString.substring(1);
+        if (hexString.length == 6) {
+          return Color(int.parse('FF$hexString', radix: 16));
+        }
+      }
+      return Colors.grey;
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
+
+  // Helper methods to load year data
+  Future<List<TimeEntryCategory>> _loadYearCategories(ConfigService configService, int year) async {
+    try {
+      // First try to load year data through the config service
+      await configService.loadYearData(year);
+      return configService.yearCategories;
+    } catch (e) {
+      debugPrint('Failed to load year categories: $e');
+      return [];
+    }
+  }
+
+  Future<List<Goal>> _loadYearGoals(ConfigService configService, int year) async {
+    try {
+      // First try to load year data through the config service
+      await configService.loadYearData(year);
+      return configService.yearGoals;
+    } catch (e) {
+      debugPrint('Failed to load year goals: $e');
+      return [];
     }
   }
 }

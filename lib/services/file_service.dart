@@ -315,6 +315,231 @@ class FileService {
     }
   }
 
+  // Load year-specific categories
+  Future<List<TimeEntryCategory>> loadYearCategories(int year) async {
+    final yearDir = Directory(path.join(_dataDirectory.path, year.toString()));
+    if (!yearDir.existsSync()) return [];
+    
+    final excelFile = File(path.join(yearDir.path, '$year.xlsx'));
+    if (!excelFile.existsSync()) return [];
+    
+    try {
+      final bytes = await excelFile.readAsBytes();
+      final excel = Excel.decodeBytes(bytes);
+      
+      if (!excel.tables.containsKey('Categories')) {
+        debugPrint('FileService: No Categories sheet found in Excel file');
+        return [];
+      }
+      
+      final categoryMaps = _parseCategoriesSheet(excel);
+      return categoryMaps.map((map) => TimeEntryCategory.fromExcelRow(map)).toList();
+    } catch (e) {
+      debugPrint('FileService: Error loading year categories: $e');
+      return [];
+    }
+  }
+
+  // Load year-specific goals
+  Future<List<Goal>> loadYearGoals(int year) async {
+    final yearDir = Directory(path.join(_dataDirectory.path, year.toString()));
+    if (!yearDir.existsSync()) return [];
+    
+    final excelFile = File(path.join(yearDir.path, '$year.xlsx'));
+    if (!excelFile.existsSync()) return [];
+    
+    try {
+      final bytes = await excelFile.readAsBytes();
+      final excel = Excel.decodeBytes(bytes);
+      
+      if (!excel.tables.containsKey('Goals')) {
+        debugPrint('FileService: No Goals sheet found in Excel file');
+        return [];
+      }
+      
+      return _parseGoalsSheet(excel);
+    } catch (e) {
+      debugPrint('FileService: Error loading year goals: $e');
+      return [];
+    }
+  }
+
+  // Save year-specific categories
+  Future<void> saveYearCategories(int year, List<TimeEntryCategory> categories) async {
+    final yearDir = Directory(path.join(_dataDirectory.path, year.toString()));
+    if (!yearDir.existsSync()) {
+      await yearDir.create(recursive: true);
+    }
+    
+    final excelFile = File(path.join(yearDir.path, '$year.xlsx'));
+    
+    // Load existing Excel file if it exists, or create new one
+    Excel excel;
+    if (await excelFile.exists()) {
+      try {
+        final bytes = await excelFile.readAsBytes();
+        excel = Excel.decodeBytes(bytes);
+      } catch (e) {
+        debugPrint('FileService: Error loading existing Excel file, creating new one: $e');
+        excel = Excel.createExcel();
+      }
+    } else {
+      excel = Excel.createExcel();
+    }
+    
+    // Update or create Categories sheet
+    final categoriesSheet = excel['Categories'];
+    
+    // Clear existing content
+    _clearSheet(categoriesSheet);
+    
+    // Headers
+    categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'Name';
+    categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'Color';
+    categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'Icon';
+    
+    // Data
+    for (int i = 0; i < categories.length; i++) {
+      final category = categories[i];
+      final row = i + 1;
+      
+      categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = category.name;
+      categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = category.color;
+      categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = category.icon;
+    }
+    
+    final bytes = excel.encode();
+    await excelFile.writeAsBytes(bytes!);
+    
+    debugPrint('FileService: Saved year categories to Excel file: ${excelFile.path}');
+  }
+
+  // Save year-specific goals
+  Future<void> saveYearGoals(int year, List<Goal> goals) async {
+    final yearDir = Directory(path.join(_dataDirectory.path, year.toString()));
+    if (!yearDir.existsSync()) {
+      await yearDir.create(recursive: true);
+    }
+    
+    final excelFile = File(path.join(yearDir.path, '$year.xlsx'));
+    
+    // Load existing Excel file if it exists, or create new one
+    Excel excel;
+    if (await excelFile.exists()) {
+      try {
+        final bytes = await excelFile.readAsBytes();
+        excel = Excel.decodeBytes(bytes);
+      } catch (e) {
+        debugPrint('FileService: Error loading existing Excel file, creating new one: $e');
+        excel = Excel.createExcel();
+      }
+    } else {
+      excel = Excel.createExcel();
+    }
+    
+    // Update or create Goals sheet
+    final goalsSheet = excel['Goals'];
+    
+    // Clear existing content
+    _clearSheet(goalsSheet);
+    
+    // Headers
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'Title';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'Description';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'Deadline';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0)).value = 'Tags';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0)).value = 'Color';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'Icon';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'Completed';
+    
+    // Data
+    for (int i = 0; i < goals.length; i++) {
+      final goal = goals[i];
+      final row = i + 1;
+      
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = goal.title;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = goal.description;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = goal.deadline.toIso8601String();
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = goal.tags.join(', ');
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = goal.color;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = goal.icon;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = goal.isCompleted ? 'Yes' : 'No';
+    }
+    
+    final bytes = excel.encode();
+    await excelFile.writeAsBytes(bytes!);
+    
+    debugPrint('FileService: Saved year goals to Excel file: ${excelFile.path}');
+  }
+
+  // Create a new year file with template data
+  Future<void> createYearFile(int year, List<TimeEntryCategory> defaultCategories, List<Goal> defaultGoals) async {
+    final yearDir = Directory(path.join(_dataDirectory.path, year.toString()));
+    if (!yearDir.existsSync()) {
+      await yearDir.create(recursive: true);
+    }
+    
+    final excelFile = File(path.join(yearDir.path, '$year.xlsx'));
+    
+    // Create new Excel file with template structure
+    final excel = Excel.createExcel();
+    
+    // Create Categories sheet
+    final categoriesSheet = excel['Categories'];
+    categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'Name';
+    categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'Color';
+    categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'Icon';
+    
+    // Add default categories
+    for (int i = 0; i < defaultCategories.length; i++) {
+      final category = defaultCategories[i];
+      final row = i + 1;
+      
+      categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = category.name;
+      categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = category.color;
+      categoriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = category.icon;
+    }
+    
+    // Create Goals sheet
+    final goalsSheet = excel['Goals'];
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'Title';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'Description';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'Deadline';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0)).value = 'Tags';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0)).value = 'Color';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'Icon';
+    goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'Completed';
+    
+    // Add default goals
+    for (int i = 0; i < defaultGoals.length; i++) {
+      final goal = defaultGoals[i];
+      final row = i + 1;
+      
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = goal.title;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = goal.description;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = goal.deadline.toIso8601String();
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = goal.tags.join(', ');
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = goal.color;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = goal.icon;
+      goalsSheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = goal.isCompleted ? 'Yes' : 'No';
+    }
+    
+    // Create Time Entries sheet
+    final timeEntriesSheet = excel['Time Entries'];
+    timeEntriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value = 'Date';
+    timeEntriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0)).value = 'Start Time';
+    timeEntriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 0)).value = 'End Time';
+    timeEntriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 0)).value = 'Duration';
+    timeEntriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 0)).value = 'Category';
+    timeEntriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 0)).value = 'Description';
+    timeEntriesSheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0)).value = 'Type';
+    
+    final bytes = excel.encode();
+    await excelFile.writeAsBytes(bytes!);
+    
+    debugPrint('FileService: Created year file with template: ${excelFile.path}');
+  }
+
   List<Map<String, String>> _parseCategoriesSheet(Excel excel) {
     final categories = <Map<String, String>>[];
     final sheet = excel['Categories'];
@@ -348,6 +573,54 @@ class FileService {
     }
     
     return categories;
+  }
+
+  List<Goal> _parseGoalsSheet(Excel excel) {
+    final goals = <Goal>[];
+    final sheet = excel['Goals'];
+    
+    // Skip header row and find actual data rows
+    for (int row = 1; row <= sheet.maxRows; row++) {
+      try {
+        final titleCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row));
+        
+        // Stop parsing if we hit an empty row
+        if (titleCell.value == null || titleCell.value.toString().trim().isEmpty) {
+          break;
+        }
+        
+        final descriptionCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row));
+        final deadlineCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row));
+        final tagsCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row));
+        final colorCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row));
+        final iconCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row));
+        final completedCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row));
+
+        final title = titleCell.value.toString();
+        final description = descriptionCell.value?.toString() ?? '';
+        final deadline = DateTime.parse(deadlineCell.value.toString());
+        final tags = tagsCell.value?.toString().split(',').map((s) => s.trim()).toList() ?? [];
+        final color = colorCell.value?.toString() ?? '#2196F3';
+        final icon = iconCell.value?.toString() ?? 'goal';
+        final isCompleted = completedCell.value?.toString().toLowerCase() == 'yes';
+        
+        goals.add(Goal(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          title: title,
+          description: description,
+          deadline: deadline,
+          tags: tags,
+          color: color,
+          icon: icon,
+          isCompleted: isCompleted,
+        ));
+      } catch (e) {
+        debugPrint('FileService: Error parsing goal row $row: $e');
+        // Continue to next row instead of breaking
+      }
+    }
+    
+    return goals;
   }
 
   Future<void> _createExcelFile(File file, List<TimeEntry> timeEntries) async {
@@ -496,5 +769,26 @@ class FileService {
     // This method is for compatibility with the old system
     // The actual directory is managed by ConfigService
     debugPrint('FileService: setDataDirectory called with $path');
+  }
+
+  // Helper method to clear sheet content
+  void _clearSheet(Sheet sheet) {
+    final maxRows = sheet.maxRows;
+    final maxCols = sheet.maxCols;
+    
+    // Only clear cells that actually exist (limit to prevent Excel errors)
+    for (int row = 0; row <= maxRows && row < 1000; row++) {
+      for (int col = 0; col <= maxCols && col < 100; col++) {
+        try {
+          final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+          if (cell.value != null) {
+            cell.value = null;
+          }
+        } catch (e) {
+          // Skip cells that can't be accessed
+          break;
+        }
+      }
+    }
   }
 }
